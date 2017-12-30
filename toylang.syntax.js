@@ -1,4 +1,3 @@
-
 const fs = require('fs')
 const code = fs.readFileSync('./code.toylang').toString()
 
@@ -11,7 +10,7 @@ function ensureArray(arg) {
 }
 
 function isReservedWord(word) {
-  return /^(return)/.test(word)
+  return /^(return|if|else)/.test(word)
 }
 
 // ===================================================================
@@ -46,7 +45,7 @@ const syntax = {
     let max_chunks = 20
 
     while(max_chunks--) {
-      chunk = syntax.parseExpression(code_inst, ignore_chunks)
+      chunk = syntax.parseExpression(code_inst, ignore_chunks) || syntax.parseDeclaration(code_inst)
       if(!chunk)
         break
 
@@ -115,6 +114,262 @@ const syntax = {
     return false
   },
 
+  parseDeclaration(inst) {
+    inst = removeEmptyLines(inst)
+
+    if(!inst)
+      return false
+
+    let decl = syntax.parseDeclarationIf(inst)
+    if(decl)
+      return decl
+
+    return false
+  },
+
+  /*
+    if = "if" if_cond_block if_chunk_block [ else ] ?
+
+    if_chunk_block = "{" if_chunk "}"
+
+    if_chunk = chunk
+
+    if_cond_block = "(" cond ")"
+
+    cond = exp [ log_op exp ] *
+
+    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "&&" | "||"
+
+    else = [ else_middle ] * else_end
+
+    else_middle = "else" if_cond_block if_chunk_block
+
+    else_end = "else" if_chunk_block
+  */
+  parseDeclarationIf(inst) {
+    if(!/^(\s*if\s*)/.test(inst))
+      return false
+
+    const cond_block = syntax.parseDeclarationIfCondBlock(inst.substr(RegExp.$1.length))
+    if(!cond_block)
+      return false
+
+    const if_chunk = syntax.parseDeclarationIfChunkBlock(cond_block.remain)
+    if(!if_chunk)
+      return false
+
+    const else_block = syntax.parseDeclarationIfElse(if_chunk.remain)
+
+    return {
+      original: inst,
+      remain: else_block.remain,
+      parsed: {
+        type: 'decl_if',
+        args: {
+          cond_block: cond_block.parsed,
+          if_chunk: if_chunk.parsed,
+          else_block: else_block && else_block.parsed
+        }
+      }
+    }
+  },
+
+  /*
+    else = [ else_middle ] * else_end
+
+    else_middle = "else" if_cond_block if_chunk_block
+
+    else_end = "else" if_chunk_block
+  */
+  parseDeclarationIfElse(inst) {
+    const else_middles = []
+    let else_middle = null
+    let code_inst = inst
+
+    while(else_middle = syntax.parseDeclarationIfElseMiddle(code_inst)) {
+      else_middles.push(else_middle.parsed)
+      code_inst = else_middle.remain
+    }
+
+    const else_end = syntax.parseDeclarationIfElseEnd(else_middle ? else_middle.remain : code_inst)
+    if(!else_end)
+      return false
+
+    return {
+      original: inst,
+      remain: else_end.remain,
+      parsed: {
+        type: 'else',
+        args: {
+          else_middles: else_middles,
+          else_end: else_end.parsed
+        }
+      }
+    }
+  },
+
+  /*
+    else_middle = "else" if_cond_block if_chunk_block
+  */
+  parseDeclarationIfElseMiddle(inst) {
+    if(!/^(\s*else\s*)/.test(inst))
+      return false
+
+    let else_cond = syntax.parseDeclarationIfCondBlock(inst.substr(RegExp.$1.length))
+    if(!else_cond)
+      return false
+
+    let else_block = syntax.parseDeclarationIfChunkBlock(else_cond.remain)
+    if(!else_block)
+      return false
+
+    return {
+      original: inst,
+      remain: else_block.remain,
+      parsed: {
+        type: 'else_middle',
+        args: {
+          cond: else_cond.parsed,
+          block: else_block.parsed
+        }
+      }
+    }
+  },
+
+  /*
+    else_end = "else" if_chunk_block
+  */
+  parseDeclarationIfElseEnd(inst) {
+    if(!/^(\s*else\s*)/.test(inst))
+      return false
+
+    let else_block = syntax.parseDeclarationIfChunkBlock(inst.substr(RegExp.$1.length))
+    if(!else_block)
+      return false
+
+    return {
+      original: inst,
+      remain: else_block.remain,
+      parsed: {
+        type: 'else_end',
+        args: else_block.parsed
+      }
+    }
+  },
+
+  /*
+    if_chunk_block = "{" if_chunk "}"
+  */
+  parseDeclarationIfChunkBlock(inst) {
+    if(!/^(\s*\{\s*)/.test(inst))
+      return false
+
+    const if_chunk = syntax.parseDeclarationIfChunk(inst.substr(RegExp.$1.length))
+    if(!if_chunk)
+      return false
+
+    if(!/^(\s*\}\s*)/.test(if_chunk.remain))
+      return false
+
+    return {
+      original: inst,
+      remain: if_chunk.remain.substr(RegExp.$1.length),
+      parsed: {
+        type: 'cond_block',
+        args: if_chunk.parsed
+      }
+    }
+  },
+
+  /*
+    if_chunk = chunk
+  */
+  parseDeclarationIfChunk(inst, ignore_chunks) {
+    return syntax.parseChunks(inst, ignore_chunks)
+  },
+
+  /*
+    if_cond_block = "(" cond ")"
+  */
+  parseDeclarationIfCondBlock(inst) {
+    if(!/^(\s*\(\s*)/.test(inst))
+      return false
+
+    const cond = syntax.parseDeclarationIfCond(inst.substr(RegExp.$1.length))
+    if(!cond)
+      return false
+
+    if(!/^(\s*\)\s*)/.test(cond.remain))
+      return false
+
+    return {
+      original: inst,
+      remain: cond.remain.substr(RegExp.$1.length),
+      parsed: {
+        type: 'cond_block',
+        args: {
+          value: cond
+        }
+      }
+    }
+  },
+
+  /*
+    cond = exp [ log_op exp ] *
+
+    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "&&" | "||"
+  */
+  parseDeclarationIfCond(inst) {
+    let exp = syntax.parseExpression(inst)
+    if(!exp)
+      return false
+
+    const conds = [exp.parsed]
+    let log_op = null
+    while(1) {
+      log_op = syntax.parseLogicOperator(exp.remain)
+      if(!log_op)
+        break
+
+      exp = syntax.parseExpression(log_op.remain)
+      if(!exp)
+        break
+
+      conds.push(log_op.parsed, exp.parsed)
+    }
+
+    return {
+      original: inst,
+      remain: exp.remain,
+      parsed: {
+        type: 'cond',
+        args: conds
+      }
+    }
+  },
+
+  /*
+    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "&&" | "||"
+  */
+  parseLogicOperator(inst) {
+    if(!/^(\s*(\|\||&&|<=|>=|!=|==|>|<|=)\s*)/.test(inst))
+      return false
+
+    const log_op_block = RegExp.$1
+    const log_op = RegExp.$2
+
+    return {
+      original: inst,
+      remain: inst.substr(log_op_block.length),
+      parsed: {
+        type: 'log_op',
+        args: {
+          value: log_op
+        }
+      }
+    }
+  },
+
   parseMathOperation(inst) {
     const exp1 = syntax.parseExpression(inst, ['math_operation'])
     if(!exp1)
@@ -181,7 +436,15 @@ const syntax = {
   },
 
   parsePrimitive(inst) {
-    let exp = syntax.parseNumber(inst)
+    let exp = syntax.parsePrimitiveNumber(inst)
+    if(exp)
+      return exp
+
+    exp = syntax.parsePrimitiveString(inst)
+    if(exp)
+      return exp
+
+    exp = syntax.parsePrimitiveBoolean(inst)
     if(exp)
       return exp
 
@@ -234,7 +497,7 @@ const syntax = {
     }
   },
 
-  parseNumber(inst) {
+  parsePrimitiveNumber(inst) {
     if(!/^(\d+)/.test(inst))
       return false
 
@@ -248,6 +511,45 @@ const syntax = {
         type: 'number',
         args: {
           value: n
+        }
+      }
+    }
+  },
+
+  parsePrimitiveString(inst) {
+    if(!/^("([^"]*)")/.test(inst))
+      return false
+
+    const quoted_string = RegExp.$1
+    const string = RegExp.$2
+    const remain = inst.substr(quoted_string.length)
+
+    return {
+      remain: remain,
+      original: inst,
+      parsed: {
+        type: 'string',
+        args: {
+          value: string
+        }
+      }
+    }
+  },
+
+  parsePrimitiveBoolean(inst) {
+    if(!/^(true|false)/.test(inst))
+      return false
+
+    const b = RegExp.$1
+    const remain = inst.substr(b.length)
+
+    return {
+      remain: remain,
+      original: inst,
+      parsed: {
+        type: 'boolean',
+        args: {
+          value: b
         }
       }
     }
@@ -455,7 +757,7 @@ const syntax = {
 
 let space = '    '
 let repeat_spaces = 0
-let log_enabled = 0
+let log_enabled = 1
 log = log_enabled ? console.log : _ => 0
 for(const prop in syntax) {
   const orig = syntax[prop]

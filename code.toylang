@@ -1,5 +1,15 @@
 f sum(a, b) {
   return a + b
 }
-d = sum(sum(1 + 2 - 2) + sum(3 + 4 - 1))
-d - 0
+
+r = sum(10, 20)
+
+if(r > 30) {
+  print("TALVEZ TRABALHA BEM")
+} else(r > 20) {
+  print("NAO TRABALHA BEM")
+} else(r > 10) {
+  print("NAO DEVE TRABALHA")
+} else {
+  print("ARE YOU SERIOUS")
+}
