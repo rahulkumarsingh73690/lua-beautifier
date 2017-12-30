@@ -1,6 +1,5 @@
-
-a = 1
-s = 2
-d = 3
-
-print(a, s, d)
+f sum(a, b) {
+  return a + b
+}
+d = sum(sum(1 + 2 - 2) + sum(3 + 4 - 1))
+d - 0
