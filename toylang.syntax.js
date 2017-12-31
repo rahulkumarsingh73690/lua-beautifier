@@ -24,12 +24,14 @@ const syntax = {
 
     while(max_parses--) {
       chunks = syntax.parseChunks(code_remain, ignore_exps)
-      ignore_exps.pop()
+
       if(chunks.remain.length > 0 && chunks.parsed.args.value.length > 0) {
         code_remain = chunks.original
-        ignore_exps.push(chunks.parsed.args.value[chunks.parsed.args.value.length - 1].parsed.type)
+        const last_chunk = chunks.parsed.args.value[chunks.parsed.args.value.length - 1]
+        ignore_exps.push(last_chunk.parsed.type)
         continue
       }
+      ignore_exps.pop()
       break
     }
 
@@ -191,9 +193,24 @@ const syntax = {
       code_inst = else_middle.remain
     }
 
-    const else_end = syntax.parseDeclarationIfElseEnd(else_middle ? else_middle.remain : code_inst)
-    if(!else_end)
-      return false
+    let else_end = syntax.parseDeclarationIfElseEnd(else_middle ? else_middle.remain : code_inst)
+    if(!else_end) {
+      let remain = code_inst
+
+      if(else_middles.length) {
+        const blocks = else_middles[else_middles.length - 1].args.block.args.args.value
+        if(blocks.length) {
+          if(!/^(\s*\}\s*)/.test(blocks[blocks.length - 1].remain))
+            return false
+          remain = blocks[blocks.length - 1].remain.substr(RegExp.$1.length)
+        }
+      }
+
+      else_end = {
+        remain: remain,
+        parsed: null
+      }
+    }
 
     return {
       original: inst,
@@ -264,9 +281,25 @@ const syntax = {
     if(!/^(\s*\{\s*)/.test(inst))
       return false
 
-    const if_chunk = syntax.parseDeclarationIfChunk(inst.substr(RegExp.$1.length))
-    if(!if_chunk)
-      return false
+    let code_inst = inst.substr(RegExp.$1.length)
+    let if_chunk = syntax.parseDeclarationIfChunk(code_inst)
+    if(if_chunk)
+      code_inst = if_chunk.remain
+    else
+      if_chunk = {
+        remain: code_inst,
+        parsed: {
+          args: {
+            value: []
+          }
+        }
+      }
+
+    const ret = syntax.parseFuncDefChunkReturn(code_inst)
+    if(ret) {
+      if_chunk.remain = ret.remain
+      if_chunk.parsed.args.value.push(ret)
+    }
 
     if(!/^(\s*\}\s*)/.test(if_chunk.remain))
       return false
@@ -606,22 +639,21 @@ const syntax = {
     let max_args = 20
 
     let exp = syntax.parseExpression(code_inst)
-    if(!exp)
-      return false
-
-    exps.push(exp.parsed)
-
-    while(max_args--) {
-      code_inst = exp.remain
-      if(!/^(\s*,\s*)/.test(code_inst))
-        break
-
-      exp = syntax.parseExpression(code_inst.substr(RegExp.$1.length))
-      if(!exp)
-        return false
-
-      code_inst = exp.remain
+    if(exp) {
       exps.push(exp.parsed)
+
+      while(max_args--) {
+        code_inst = exp.remain
+        if(!/^(\s*,\s*)/.test(code_inst))
+          break
+
+        exp = syntax.parseExpression(code_inst.substr(RegExp.$1.length))
+        if(!exp)
+          return false
+
+        code_inst = exp.remain
+        exps.push(exp.parsed)
+      }
     }
 
     return {
@@ -646,11 +678,11 @@ const syntax = {
       return false
 
     const fargs = syntax.parseFuncDefArgsChunk(fname.remain)
+
     if(!fargs)
       return false
 
     const body = syntax.parseFuncDefChunk(fargs.remain)
-
     if(!body)
       return false
 
@@ -757,7 +789,7 @@ const syntax = {
 
 let space = '    '
 let repeat_spaces = 0
-let log_enabled = 1
+let log_enabled = 0
 log = log_enabled ? console.log : _ => 0
 for(const prop in syntax) {
   const orig = syntax[prop]

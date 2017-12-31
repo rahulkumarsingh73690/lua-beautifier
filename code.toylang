@@ -1,15 +1,12 @@
-f sum(a, b) {
-  return a + b
+f obj() {
+  obj = "OBJ" + "ECT"
+  return f f(op, key, value) {
+    if(op == "set") {
+      obj(key, value)
+    } else(op == "get") {
+      return obj(key)
+    }
+  }
 }
 
-r = sum(10, 20)
-
-if(r > 30) {
-  print("TALVEZ TRABALHA BEM")
-} else(r > 20) {
-  print("NAO TRABALHA BEM")
-} else(r > 10) {
-  print("NAO DEVE TRABALHA")
-} else {
-  print("ARE YOU SERIOUS")
-}
+o = obj()
