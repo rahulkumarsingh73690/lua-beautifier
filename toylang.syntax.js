@@ -17,41 +17,21 @@ function isReservedWord(word) {
 
 const syntax = {
   parse(code) {
-    let max_parses = 20
-    let chunks = null
-    const ignore_exps = []
-    let code_remain = code
-
-    while(max_parses--) {
-      chunks = syntax.parseChunks(code_remain, ignore_exps)
-
-      if(chunks.remain.length > 0 && chunks.parsed.args.value.length > 0) {
-        code_remain = chunks.original
-        const last_chunk = chunks.parsed.args.value[chunks.parsed.args.value.length - 1]
-        ignore_exps.push(last_chunk.parsed.type)
-        continue
-      }
-      ignore_exps.pop()
-      break
-    }
-
-    return chunks
+    return syntax.parseChunks(code)
   },
 
-  parseChunks(inst, ignore_chunks) {
-    ignore_chunks = ensureArray(ignore_chunks)
-
+  parseChunks(inst) {
     const chunks = []
     let chunk = null
     let code_inst = inst
     let max_chunks = 20
 
     while(max_chunks--) {
-      chunk = syntax.parseExpression(code_inst, ignore_chunks) || syntax.parseDeclaration(code_inst)
+      chunk = syntax.parseExpression(code_inst) || syntax.parseDeclaration(code_inst)
+
       if(!chunk)
         break
 
-      ignore_chunks.pop()
       code_inst = chunk.remain
       chunks.push(chunk)
     }
@@ -481,7 +461,72 @@ const syntax = {
     if(exp)
       return exp
 
+    exp = syntax.parsePrimitiveArray(inst)
+    if(exp)
+      return exp
+
     return false
+  },
+
+  /*
+    array = "[" array_list "]"
+
+    array_list = [ exp array_list_continuation * ] ?
+
+    array_list_continuation = "," exp
+  */
+  parsePrimitiveArray(inst) {
+    if(!/^(\s*\[\s*)/.test(inst))
+      return false
+
+    const array_list = syntax.parsePrimitiveArrayList(inst.substr(RegExp.$1.length))
+    if(!array_list)
+      return false
+
+    if(!/^(\s*\]\s*)/.test(array_list.remain))
+      return false
+
+    return {
+      original: inst,
+      remain: array_list.remain.substr(RegExp.$1.length),
+      parsed: {
+        type: 'array',
+        args: array_list.parsed
+      }
+    }
+  },
+
+  /*
+    array_list = [ exp array_list_continuation * ] ?
+
+    array_list_continuation = "," exp
+  */
+  parsePrimitiveArrayList(inst) {
+    const array_list = {
+      original: inst,
+      remain: inst,
+      parsed: {
+        type: 'array_list',
+        args: []
+      }
+    }
+
+    let exp = syntax.parseExpression(array_list.remain)
+    if(!exp)
+      return array_list
+
+    array_list.parsed.args.push(exp)
+
+    while(/^(\s*,\s*)/.test(exp.remain)) {
+      exp = syntax.parseExpression(exp.remain.substr(RegExp.$1.length))
+      if(!exp)
+        break
+
+      array_list.parsed.args.push(exp)
+    }
+
+    array_list.remain = exp.remain
+    return array_list
   },
 
   parseAssign(inst) {
