@@ -275,6 +275,7 @@ const syntax = {
         }
       }
 
+    code_inst = removeEmptyLines(code_inst)
     const ret = syntax.parseFuncDefChunkReturn(code_inst)
     if(ret) {
       if_chunk.remain = ret.remain
@@ -529,6 +530,9 @@ const syntax = {
     return array_list
   },
 
+  /*
+    assign = variable "=" exp
+  */
   parseAssign(inst) {
     const v = syntax.parseVariable(inst)
     if(!v)
@@ -556,6 +560,9 @@ const syntax = {
     }
   },
 
+  /*
+    variable = [ a-z ] +
+  */
   parseVariable(inst) {
     if(!/^([a-z]+)/.test(inst))
       return false
@@ -834,7 +841,8 @@ const syntax = {
 
 let space = '    '
 let repeat_spaces = 0
-let log_enabled = 0
+let log_enabled = parseInt(process.argv[2])
+const props = []
 log = log_enabled ? console.log : _ => 0
 for(const prop in syntax) {
   const orig = syntax[prop]
@@ -843,11 +851,13 @@ for(const prop in syntax) {
     var sp = space.repeat(repeat_spaces)
 
     log('='.repeat(100))
-    log(sp + prop)
+    props.push(prop)
+    log(props.join('\t'))
     log(JSON.stringify(args, 0, 2).replace(/^(.)/gm, sp + '$1'))
 
     repeat_spaces++
     const ret = orig(...args)
+    props.pop()
     const json_ret = JSON.stringify(ret, 0, 2)
 
     log(sp + 'RETURN', prop)

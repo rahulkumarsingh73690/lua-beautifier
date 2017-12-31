@@ -2,9 +2,14 @@ f obj() {
   obj = "OBJ" + "ECT"
   return f f(op, key, value) {
     if(op == "set") {
-      obj(key, value)
+      a = 1
+      return obj(key, value)
     } else(op == "get") {
+      a = 2
       return obj(key)
+    } else {
+      a = 3
+      return false
     }
   }
 }
