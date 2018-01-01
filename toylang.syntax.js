@@ -104,7 +104,7 @@ const syntax = {
 
       let ext = null
 
-      while(ext = syntax.extendExpressionObject(exp.remain)) {
+      while(ext = syntax.extendExpressionObject(exp.remain) || syntax.extendExpressionArray(exp.remain)) {
         exp.remain = removeEmptyLines(ext.remain)
         exp.parsed.exts.push(ext.parsed)
       }
@@ -129,6 +129,30 @@ const syntax = {
       remain: exp.remain,
       parsed: {
         type: 'extend_object',
+        args: exp.parsed
+      }
+    }
+  },
+
+  /*
+    ext_array = "[" exp "]"
+  */
+  extendExpressionArray(inst) {
+    if(!/^(\s*\[\s*)/.test(inst))
+      return false
+
+    const exp = syntax.parseExpression(inst.substr(RegExp.$1.length))
+    if(!exp)
+      return false
+
+    if(!/^(\s*\]\s*)/.test(exp.remain))
+      return false
+
+    return {
+      original: inst,
+      remain: exp.remain.substr(RegExp.$1.length),
+      parsed: {
+        type: 'extend_array',
         args: exp.parsed
       }
     }
