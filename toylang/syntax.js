@@ -1,5 +1,3 @@
-const fs = require('fs')
-const code = fs.readFileSync('./code.toylang').toString()
 
 function removeEmptyLines(inst) {
   return inst.replace(/^\s*/, '')
@@ -22,8 +20,6 @@ const isExtensibleExpression = (function() {
     )
   }
 })()
-
-// ===================================================================
 
 const syntax = {
   parse(code) {
@@ -720,7 +716,7 @@ const syntax = {
     number = [ "+" | "-" ] ? [0-9] +
   */
   parsePrimitiveNumber(inst) {
-    if(!/^([-+]?\d+)/.test(inst))
+    if(!/^([-+]?\d+(?:\.\d+)?)/.test(inst))
       return false
 
     const n = RegExp.$1
@@ -815,9 +811,7 @@ const syntax = {
       original: inst,
       parsed: {
         type: 'func_call_args_chunk',
-        args: {
-          args: args.parsed
-        }
+        args: args.parsed
       }
     }
   },
@@ -976,48 +970,4 @@ const syntax = {
   }
 }
 
-let space = '    '
-let repeat_spaces = 0
-let log_enabled = parseInt(process.argv[2])
-const props = []
-log = log_enabled ? console.log : _ => 0
-for(const prop in syntax) {
-  const orig = syntax[prop]
-
-  syntax[prop] = (...args) => {
-    var sp = space.repeat(repeat_spaces)
-
-    log('='.repeat(100))
-    props.push(prop)
-    log(props.join('\t'))
-    log(JSON.stringify(args, 0, 2).replace(/^(.)/gm, sp + '$1'))
-
-    repeat_spaces++
-    const ret = orig(...args)
-    props.pop()
-    const json_ret = JSON.stringify(ret, 0, 2)
-
-    log(sp + 'RETURN', prop)
-    if(json_ret)
-      log(json_ret.replace(/^(.)/gm, sp + '$1'))
-    else
-      log(sp + json_ret)
-
-    repeat_spaces--
-    return ret
-  }
-}
-
-console.log('PARSERS')
-console.log(Object.keys(syntax).sort())
-
-console.log('================================')
-console.log('FILE')
-console.log(code)
-
-console.log('================================')
-console.log('Parsing...')
-const parsed = syntax.parse(code)
-console.log('================================')
-console.log('Parsed')
-console.log(JSON.stringify(parsed, 0, 2))
+module.exports = Object.create(syntax)
