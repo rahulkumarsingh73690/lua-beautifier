@@ -13,3 +13,26 @@ f = "name".upper()
 g = [1,2,3][0]
 
 h = true.that
+
+math = {
+  sum = f sum(a, b) {
+    return a + b
+  };
+  pow = f pow(a) {
+    return a * a
+  };
+  ff = math.sum();
+  obj = f obj(name, value) {
+    tmp = {}
+    tmp[name] = value
+    return f access(op, value) {
+      if(op == "get") {
+        return tmp[name]
+      } else(op == "set") {
+        return tmp[name] = value
+      }
+
+      return false
+    }
+  }
+}

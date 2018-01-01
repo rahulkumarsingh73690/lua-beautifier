@@ -2,7 +2,7 @@ const fs = require('fs')
 const code = fs.readFileSync('./code.toylang').toString()
 
 function removeEmptyLines(inst) {
-  return inst.replace(/^(?:\n|\s)*/, '')
+  return inst.replace(/^\s*/, '')
 }
 
 function ensureArray(arg) {
@@ -152,7 +152,7 @@ const syntax = {
       original: inst,
       remain: exp.remain.substr(RegExp.$1.length),
       parsed: {
-        type: 'extend_array',
+        type: 'extend_computed',
         args: exp.parsed
       }
     }
@@ -521,7 +521,7 @@ const syntax = {
     let exp = syntax.parsePrimitiveNumber(inst) ||
       syntax.parsePrimitiveString(inst) ||
       syntax.parsePrimitiveBoolean(inst) ||
-      syntax.parsePrimitiveArray(inst)
+      syntax.parsePrimitiveArray(inst) ||
       syntax.parsePrimitiveObject(inst)
 
     return exp && {
@@ -540,18 +540,72 @@ const syntax = {
     obj_map = variable "=" exp | obj_map
   */
   parsePrimitiveObject(inst) {
+    if(!/^(\s*\{\s*)/.test(inst))
+      return false
+
+    const object_map = syntax.parsePrimitiveObjectMap(inst.substr(RegExp.$1.length))
+    if(!/^(\s*\}\s*)/.test(object_map.remain))
+      return false
+
+    return {
+      original: inst,
+      remain: object_map.remain.substr(RegExp.$1.length),
+      parsed: {
+        type: 'object',
+        args: object_map.parsed
+      }
+    }
   },
 
   /*
-    obj_map = variable "=" exp | obj_map
+    obj_map = variable "=" exp [ obj_map_continuation ] *
+
+    obj_map_continuation = ";" variable "=" exp
   */
   parsePrimitiveObjectMap(inst) {
+    const map = []
+    let name = null
+    let exp = null
+    let code_inst = inst
+
+    while(1) {
+      name = syntax.parseVariable(code_inst)
+      if(!name)
+        break
+
+      if(!/^(\s*=\s*)/.test(name.remain))
+        break
+
+      exp = syntax.parseExpression(name.remain.substr(RegExp.$1.length))
+      if(!exp)
+        break
+
+      map.push({
+        key: name.parsed,
+        value: exp.parsed
+      })
+
+      code_inst = exp.remain
+      if(!/^(\s*;\s*)/.test(exp.remain))
+        break
+
+      code_inst = exp.remain.substr(RegExp.$1.length)
+    }
+
+    return {
+      original: inst,
+      remain: code_inst,
+      parsed: {
+        type: 'object_map',
+        args: map
+      }
+    }
   },
 
   /*
-    array = "[" array_list "]"
+    array = "[" [ array_list ] ? "]"
 
-    array_list = [ exp array_list_continuation * ] ?
+    array_list = exp [ array_list_continuation ] *
 
     array_list_continuation = "," exp
   */
@@ -617,7 +671,8 @@ const syntax = {
     if(!v)
       return false
 
-    const code_inst = v.remain
+    const ext = syntax.extendExpression(v)
+    const code_inst = ext.remain
 
     if(!/^(\s*=\s*)/.test(code_inst))
       return false
@@ -661,8 +716,11 @@ const syntax = {
     }
   },
 
+  /*
+    number = [ "+" | "-" ] ? [0-9] +
+  */
   parsePrimitiveNumber(inst) {
-    if(!/^(\d+)/.test(inst))
+    if(!/^([-+]?\d+)/.test(inst))
       return false
 
     const n = RegExp.$1
@@ -847,7 +905,7 @@ const syntax = {
       remain: varcs.remain.substr(RegExp.$1.length),
       original: inst,
       parsed: {
-        type: 'func_def_args',
+        type: 'func_def_args_chunk',
         args: varcs.parsed
       }
     }
@@ -909,7 +967,7 @@ const syntax = {
       remain: code_inst,
       original: inst,
       parsed: {
-        type: 'func_args',
+        type: 'func_def_args_list',
         args: {
           args: args
         }
