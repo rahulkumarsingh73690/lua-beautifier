@@ -1,3 +1,15 @@
-a.b.c.d(e.f(), g.h(i.j, k.l(), m.n), o.p.q(r.s.t.u()), v.w.x.y.z)
-a = [1,2,3]
-print(a[0], a[1], a[2])
+
+f f() {
+  a = 2
+  return [1,a,3]
+}
+
+s = f()[0]
+
+d = 1.next()
+
+f = "name".upper()
+
+g = [1,2,3][0]
+
+h = true.that

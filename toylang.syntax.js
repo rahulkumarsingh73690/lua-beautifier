@@ -10,7 +10,7 @@ function ensureArray(arg) {
 }
 
 function isReservedWord(word) {
-  return /^(return|if|else)/.test(word)
+  return /^(return|if|else|true|false)/.test(word)
 }
 
 const isExtensibleExpression = (function() {
@@ -515,23 +515,19 @@ const syntax = {
   },
 
   parsePrimitive(inst) {
-    let exp = syntax.parsePrimitiveNumber(inst)
-    if(exp)
-      return exp
+    let exp = syntax.parsePrimitiveNumber(inst) ||
+      syntax.parsePrimitiveString(inst) ||
+      syntax.parsePrimitiveBoolean(inst) ||
+      syntax.parsePrimitiveArray(inst)
 
-    exp = syntax.parsePrimitiveString(inst)
-    if(exp)
-      return exp
-
-    exp = syntax.parsePrimitiveBoolean(inst)
-    if(exp)
-      return exp
-
-    exp = syntax.parsePrimitiveArray(inst)
-    if(exp)
-      return exp
-
-    return false
+    return exp && {
+      original: inst,
+      remain: exp.remain,
+      parsed: {
+        type: 'primitive',
+        args: exp.parsed
+      }
+    }
   },
 
   /*
