@@ -13,6 +13,16 @@ function isReservedWord(word) {
   return /^(return|if|else)/.test(word)
 }
 
+const isExtensibleExpression = (function() {
+  const extensible_expressions = 'func_call primitive variable'.split(' ')
+
+  return function isExtensibleExpression(exp) {
+    return !!~extensible_expressions.indexOf(
+      exp && exp.parsed && exp.parsed.type
+    )
+  }
+})()
+
 // ===================================================================
 
 const syntax = {
@@ -55,47 +65,78 @@ const syntax = {
     if(!inst)
       return false
 
-    let exp = null
+    let exp = false
 
-    if(!~ignore_chunks.indexOf('assign')) {
+    if(!~ignore_chunks.indexOf('assign'))
       exp = syntax.parseAssign(inst)
-      if(exp)
-        return exp
-    }
 
-    if(!~ignore_chunks.indexOf('math_operation')) {
+    if(!exp && !~ignore_chunks.indexOf('math_operation'))
       exp = syntax.parseMathOperation(inst)
-      if(exp)
-        return exp
-    }
 
-    if(!~ignore_chunks.indexOf('func_call')) {
+    if(!exp && !~ignore_chunks.indexOf('func_call'))
       exp = syntax.parseFuncCall(inst)
-      if(exp)
-        return exp
-    }
 
-    if(!~ignore_chunks.indexOf('func_def')) {
+    if(!exp && !~ignore_chunks.indexOf('func_def'))
       exp = syntax.parseFuncDef(inst)
-      if(exp)
-        return exp
-    }
 
-    if(!~ignore_chunks.indexOf('primitive')) {
+    if(!exp && !~ignore_chunks.indexOf('primitive'))
       exp = syntax.parsePrimitive(inst)
-      if(exp)
-        return exp
-    }
 
-    if(!~ignore_chunks.indexOf('variable')) {
+    if(!exp && !~ignore_chunks.indexOf('variable'))
       exp = syntax.parseVariable(inst)
-      if(exp)
-        return exp
-    }
 
-    return false
+    if(!~ignore_chunks.indexOf('ext'))
+      exp = syntax.extendExpression(exp)
+
+    return exp
   },
 
+  /*
+    ext_exp = exp [ ext_object | ext_array ] *
+
+    ext_object = "." exp
+
+    ext_array = "[" exp "]"
+  */
+  extendExpression(exp) {
+    if(isExtensibleExpression(exp)) {
+      exp.parsed.exts = []
+
+      let ext = null
+
+      while(ext = syntax.extendExpressionObject(exp.remain)) {
+        exp.remain = removeEmptyLines(ext.remain)
+        exp.parsed.exts.push(ext.parsed)
+      }
+    }
+
+    return exp
+  },
+
+  /*
+    ext_object = "." exp
+  */
+  extendExpressionObject(inst) {
+    if(!/^(\s*\.\s*)/.test(inst))
+      return false
+
+    const exp = syntax.parseExpression(inst.substr(RegExp.$1.length), ['ext'])
+    if(!exp)
+      return false
+
+    return {
+      original: inst,
+      remain: exp.remain,
+      parsed: {
+        type: 'extend_object',
+        args: exp.parsed
+      }
+    }
+  },
+
+  /*
+    decl = if
+  */
   parseDeclaration(inst) {
     inst = removeEmptyLines(inst)
 
