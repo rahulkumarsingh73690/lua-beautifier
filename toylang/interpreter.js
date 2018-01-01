@@ -14,10 +14,18 @@ const global_scope = {
 const interpreter = {
   parse(ast, scope) {
     scope = inheritGlobalScope(scope)
+
     ast.parsed.args.value.forEach(function(chunk) {
       if(chunk.parsed.type === 'func_call')
         interpreter.intFuncCall(chunk.parsed, scope)
+
+      if(chunk.parsed.type === 'assign')
+        interpreter.intAssign(chunk.parsed, scope)
     })
+  },
+
+  intAssign(ast, scope) {
+    scope[ast.args.left.args.value] = interpreter.intExpression(ast.args.right)
   },
 
   intFuncCall(ast, scope) {
@@ -42,15 +50,38 @@ const interpreter = {
   intExpression(ast, scope) {
     if(ast.type === 'primitive')
       return interpreter.intPrimitive(ast.args, scope)
+
+    if(ast.type === 'variable')
+      return interpreter.intVariable(ast.args, scope)
+  },
+
+  intVariable(ast, scope) {
+    if(ast.value in scope)
+      return scope[ast.value]
+    throw new TypeError(`${ast.value} is not defined`)
   },
 
   intPrimitive(ast, scope) {
     if(ast.type === 'number')
       return interpreter.intNumber(ast.args, scope)
+
+    if(ast.type === 'string')
+      return interpreter.intString(ast.args, scope)
+
+    if(ast.type === 'boolean')
+      return interpreter.intBoolean(ast.args, scope)
   },
 
   intNumber(ast, scope) {
     return parseFloat(ast.value)
+  },
+
+  intString(ast, scope) {
+    return ast.value
+  },
+
+  intBoolean(ast, scope) {
+    return Boolean(ast.value)
   }
 }
 

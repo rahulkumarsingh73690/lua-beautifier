@@ -23,7 +23,14 @@ const isExtensibleExpression = (function() {
 
 const syntax = {
   parse(code) {
-    return syntax.parseChunks(code)
+    const ast = syntax.parseChunks(code)
+    if(ast.remain)
+      syntax.throwError(ast)
+    return ast
+  },
+
+  throwError(ast) {
+    throw new SyntaxError('Unexpected token somewhere (NYI)')
   },
 
   parseChunks(inst) {
@@ -735,11 +742,11 @@ const syntax = {
   },
 
   parsePrimitiveString(inst) {
-    if(!/^("([^"]*)")/.test(inst))
+    if(!/^((['|"])([^\2]*)(\2))/.test(inst))
       return false
 
     const quoted_string = RegExp.$1
-    const string = RegExp.$2
+    const string = RegExp.$3
     const remain = inst.substr(quoted_string.length)
 
     return {
