@@ -514,11 +514,15 @@ const syntax = {
     }
   },
 
+  /*
+    primitive = number | string | boolean | array | object
+  */
   parsePrimitive(inst) {
     let exp = syntax.parsePrimitiveNumber(inst) ||
       syntax.parsePrimitiveString(inst) ||
       syntax.parsePrimitiveBoolean(inst) ||
       syntax.parsePrimitiveArray(inst)
+      syntax.parsePrimitiveObject(inst)
 
     return exp && {
       original: inst,
@@ -528,6 +532,20 @@ const syntax = {
         args: exp.parsed
       }
     }
+  },
+
+  /*
+    obj = "{" [ obj_map ] ? "}"
+
+    obj_map = variable "=" exp | obj_map
+  */
+  parsePrimitiveObject(inst) {
+  },
+
+  /*
+    obj_map = variable "=" exp | obj_map
+  */
+  parsePrimitiveObjectMap(inst) {
   },
 
   /*
