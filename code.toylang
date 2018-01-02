@@ -1,54 +1,13 @@
-a = 1
-b = 2
 
-f one() {
-  return 1
+a = [1,2,4]
+
+s = {
+  a = 10;
+  s = "texto";
+  d = true;
+  f = a;
+  g = f f() { return 1 }
 }
 
-f sum(c, d) {
-  e = 10
-  return one() + a + b + c + d + e + 1.1
-}
-
-f call(func, d, e) {
-  return func(d, e)
-}
-
-f loop(f, start, end) {
-  if(start < end) {
-    f(start, end)
-    loop(f, start + 1, end)
-  } else(start == end) {
-    print("ending...")
-    loop(f, start + 1, end)
-  } else {
-    print("end")
-  }
-}
-
-f loop_f(start, end) {
-  print(start, "*", start, "=", start * start)
-}
-
-print(
-  call(sum, 3, 4)
-)
-
-loop(loop_f, 0, 10)
-
-f iff(n) {
-  if(n == 1) {
-    return "IF"
-  } else(n == 2) {
-    return "ELSE MIDDLE 1"
-  } else(n == 3) {
-    return "ELSE MIDDLE 2"
-  } else {
-    return "ELSE"
-  }
-}
-
-print(iff(1))
-print(iff(2))
-print(iff(3))
-print(iff(4))
+print(a)
+print(s)

@@ -241,6 +241,12 @@ const interpreter = {
     else if(ast.args.type === 'boolean')
       return interpreter.intBoolean(ast.args.args, scope)
 
+    else if(ast.args.type === 'array')
+      return interpreter.intArray(ast.args.args, scope)
+
+    else if(ast.args.type === 'object')
+      return interpreter.intObject(ast.args.args, scope)
+
     else
       throw new Error('Interpreter error (intPrimitive): ' + ast.args.type)
   },
@@ -255,6 +261,22 @@ const interpreter = {
 
   intBoolean(ast, scope) {
     return Boolean(ast.value)
+  },
+
+  intArray(ast, scope) {
+    return ast.args.map(function(arg) {
+      return interpreter.intExpression(arg.parsed, scope)
+    })
+  },
+
+  intObject(ast, scope) {
+    const obj = {}
+    ast.args.forEach(function(arg) {
+      if(arg.key.args.value in obj)
+        throw new TypeError(`"${arg.key.args.value}" is already defined`)
+      obj[arg.key.args.value] = interpreter.intExpression(arg.value, scope)
+    })
+    return obj
   }
 }
 
