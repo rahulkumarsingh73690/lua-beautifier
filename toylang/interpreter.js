@@ -14,14 +14,25 @@ const global_scope = {
 const interpreter = {
   parse(ast, scope) {
     scope = inheritGlobalScope(scope)
+    let ret = void 0
 
-    return ast.parsed.args.value.reduce(function(acc, chunk) {
-      if(chunk.parsed)
-        return interpreter.intExpression(chunk.parsed, scope)
+    return ast.parsed.args.value.reduce(function(acc, chunk, index) {
+      if(acc && 'ret' in acc)
+        return acc
 
-      else
+      else if(chunk.parsed) {
+        ret = interpreter.intExpression(chunk.parsed, scope)
+
+        if(chunk.parsed.type === 'func_return')
+          return {
+            ret: ret
+          }
+
+        return ret
+
+      } else
         throw new Error('Interpreter error (parse): ' + chunk.parsed.type)
-    }, void 0)
+    }, ret)
   },
 
   intDeclIf(ast, scope) {
@@ -128,9 +139,6 @@ const interpreter = {
   },
 
   intFuncDef(ast, scope) {
-    if(ast.args.name.args.value in scope)
-      throw new TypeError(`"${ast.args.left.args.value}" can't be redefined`)
-
     return scope[ast.args.name.args.value] = function() {
       const values = Array.from(arguments)
       const inner_scope = inheritGlobalScope(scope)
@@ -143,7 +151,8 @@ const interpreter = {
         inner_scope[var_name] = value
       })
 
-      return interpreter.parse({parsed: ast.args.body}, inner_scope)
+      const ret = interpreter.parse({parsed: ast.args.body}, inner_scope)
+      return ret && 'ret' in ret ? ret.ret : ret
     }
   },
 
@@ -152,8 +161,6 @@ const interpreter = {
   },
 
   intAssign(ast, scope) {
-    if(ast.args.left.args.value in scope)
-      throw new TypeError(`"${ast.args.left.args.value}" can't be redefined`)
     return scope[ast.args.left.args.value] = interpreter.intExpression(ast.args.right, scope)
   },
 

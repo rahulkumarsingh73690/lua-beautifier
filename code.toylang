@@ -1,20 +1,15 @@
 
-a = [1,2,4]
-
-s = {
-  a = 10;
-  s = "texto";
-  d = true;
-  f = a;
-  g = f f() { return 1 }
+f obj() {
+  return {
+    a = 10
+  }
 }
 
-f sum(d, s) {
-  return d + s
+f arr() {
+  return [
+    obj()
+  ]
 }
 
-q = 10 + 20
-
-print(sum)
-print(a)
-print(q)
+print(obj())
+print(arr())
