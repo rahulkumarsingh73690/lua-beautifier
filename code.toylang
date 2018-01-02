@@ -9,5 +9,12 @@ s = {
   g = f f() { return 1 }
 }
 
+f sum(d, s) {
+  return d + s
+}
+
+q = 10 + 20
+
+print(sum)
 print(a)
-print(s)
+print(q)

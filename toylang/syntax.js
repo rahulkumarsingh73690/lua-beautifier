@@ -699,7 +699,7 @@ const syntax = {
   },
 
   /*
-    variable = [ a-z ] +
+    variable = [ _a-z ] +
   */
   parseVariable(inst) {
     if(!/^([_a-z]+)/.test(inst))

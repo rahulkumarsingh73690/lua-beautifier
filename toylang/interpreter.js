@@ -75,9 +75,44 @@ const interpreter = {
       else if(op.args.value === '==')
         return interpreter.intLogOpEQ(acc, exp)
 
+      else if(op.args.value === '!=')
+        return interpreter.intLogOpNEQ(acc, exp)
+
+      else if(op.args.value === '>=')
+        return interpreter.intLogOpGTE(acc, exp)
+
+      else if(op.args.value === '<=')
+        return interpreter.intLogOpLTE(acc, exp)
+
+      else if(op.args.value === '&&')
+        return interpreter.intLogOpAND(acc, exp)
+
+      else if(op.args.value === '||')
+        return interpreter.intLogOpOR(acc, exp)
+
       else
         throw new Error('Interpreter error (intCondBlock): ' + op.args.value)
     }, exps[0])
+  },
+
+  intLogOpAND(val1, val2) {
+    return val1 && val2;
+  },
+
+  intLogOpOR(val1, val2) {
+    return val1 || val2;
+  },
+
+  intLogOpLTE(val1, val2) {
+    return val1 <= val2;
+  },
+
+  intLogOpGTE(val1, val2) {
+    return val1 >= val2;
+  },
+
+  intLogOpNEQ(val1, val2) {
+    return val1 !== val2;
   },
 
   intLogOpLT(val1, val2) {
@@ -93,6 +128,9 @@ const interpreter = {
   },
 
   intFuncDef(ast, scope) {
+    if(ast.args.name.args.value in scope)
+      throw new TypeError(`"${ast.args.left.args.value}" can't be redefined`)
+
     return scope[ast.args.name.args.value] = function() {
       const values = Array.from(arguments)
       const inner_scope = inheritGlobalScope(scope)
@@ -114,6 +152,8 @@ const interpreter = {
   },
 
   intAssign(ast, scope) {
+    if(ast.args.left.args.value in scope)
+      throw new TypeError(`"${ast.args.left.args.value}" can't be redefined`)
     return scope[ast.args.left.args.value] = interpreter.intExpression(ast.args.right, scope)
   },
 
