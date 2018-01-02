@@ -7,6 +7,13 @@ function inheritGlobalScope(obj) {
   return Object.assign(Object.create(global_scope), ensureObject(obj))
 }
 
+const isExtensible = (function isExtensible(exp) {
+  const extensible = 'func_call variable primitive'.split(' ')
+  return function isExtensible(exp) {
+    return !!~extensible.indexOf(exp && exp.type)
+  }
+})()
+
 const global_scope = {
   print: console.log.bind(console)
 }
@@ -221,6 +228,36 @@ const interpreter = {
 
     else
       throw exp
+
+    return interpreter.extExpression(ast, exp, scope)
+  },
+
+  extExpression(ast, exp, scope) {
+    if(!(isExtensible(ast) && ast.exts.length))
+      return exp
+
+    return ast.exts.reduce(function(acc, ext) {
+      if(ext.type === 'extend_object') {
+        if(!(ext.args.args.value in acc))
+          throw new ReferenceError(`Property "${ext.args.args.value}" does not exist`)
+        return acc[ext.args.args.value]
+
+      } else if(ext.type === 'extend_computed') {
+        const index = interpreter.intExpression(ext.args, scope)
+        if(!(index in acc))
+          throw new ReferenceError(`Property "${index}" does not exist`)
+        return acc[index]
+
+      } else
+        throw new Error('Interpreter error (extExpression): ' + ext.type)
+    }, exp)
+
+    const ext = interpreter.intExpression(ast.exts[0].args, exp)
+
+    console.log('.'.repeat(10))
+    console.log(JSON.stringify(ast.exts,0,2))
+    console.log(exp)
+    console.log(ext)
 
     return exp
   },

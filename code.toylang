@@ -1,15 +1,30 @@
 
-f obj() {
-  return {
-    a = 10
+q = {
+  w = {
+    r = [1,2,3]
   }
 }
 
-f arr() {
-  return [
-    obj()
-  ]
+f obj() {
+  return {
+    a = {
+      s = 1
+    }
+  }
 }
 
-print(obj())
-print(arr())
+f letter_s() {
+  return "s"
+}
+
+f letter_a() {
+  return "a"
+}
+
+print("=", obj()[
+  letter_a()
+][
+  letter_s()
+])
+
+print("=", q.w.r)
