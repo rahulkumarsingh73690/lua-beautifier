@@ -30,7 +30,7 @@ const syntax = {
   },
 
   throwError(ast) {
-    console.log(ast.remain)
+    console.log(JSON.stringify(ast, 0, 2))
     throw new SyntaxError('Unexpected token somewhere (NYI)')
   },
 
@@ -108,7 +108,7 @@ const syntax = {
 
       let ext = null
 
-      while(ext = syntax.extendExpressionObject(exp.remain) || syntax.extendExpressionArray(exp.remain)) {
+      while(ext = syntax.extendExpressionObject(exp.remain) || syntax.extendExpressionArray(exp.remain) || syntax.extendExpressionFuncCall(exp.remain)) {
         exp.remain = removeEmptyLines(ext.remain)
         exp.parsed.exts.push(ext.parsed)
       }
@@ -160,6 +160,10 @@ const syntax = {
         args: exp.parsed
       }
     }
+  },
+
+  extendExpressionFuncCall(inst) {
+    return syntax.parseFuncCallArgsChunk(inst)
   },
 
   /*
@@ -803,6 +807,13 @@ const syntax = {
     }
   },
 
+  /*
+    func_call_args_chunk = "(" [ exp_list ] ? ")"
+
+    exp_list = exp [ exp_continuation ] *
+
+    exp_continuation = "," exp
+  */
   parseFuncCallArgsChunk(inst) {
     if(!/^(\s*\(\s*)/.test(inst))
       return false
