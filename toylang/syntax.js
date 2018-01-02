@@ -30,6 +30,7 @@ const syntax = {
   },
 
   throwError(ast) {
+    console.log(ast.remain)
     throw new SyntaxError('Unexpected token somewhere (NYI)')
   },
 
@@ -701,7 +702,7 @@ const syntax = {
     variable = [ a-z ] +
   */
   parseVariable(inst) {
-    if(!/^([a-z]+)/.test(inst))
+    if(!/^([_a-z]+)/.test(inst))
       return false
 
     if(isReservedWord(RegExp.$1))
@@ -742,11 +743,11 @@ const syntax = {
   },
 
   parsePrimitiveString(inst) {
-    if(!/^((['|"])([^\2]*)(\2))/.test(inst))
+    if(!/^("([^"]*)")/.test(inst))
       return false
 
     const quoted_string = RegExp.$1
-    const string = RegExp.$3
+    const string = RegExp.$2
     const remain = inst.substr(quoted_string.length)
 
     return {

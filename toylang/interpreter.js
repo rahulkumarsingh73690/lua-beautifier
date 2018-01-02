@@ -25,12 +25,80 @@ const interpreter = {
       else if(chunk.parsed.type === 'func_def')
         interpreter.intFuncDef(chunk.parsed, scope)
 
+      else if(chunk.parsed.type === 'decl_if')
+        interpreter.intDeclIf(chunk.parsed, scope)
+
       else if(chunk.parsed.type === 'func_return')
         return interpreter.intFuncReturn(chunk.parsed, scope)
 
       else
         throw new Error('Interpreter error (parse): ' + chunk.parsed.type)
     }, void 0)
+  },
+
+  intDeclIf(ast, scope) {
+    const cond_ret = interpreter.intCondBlock(ast.args.cond_block, scope)
+
+    if(cond_ret)
+      interpreter.parse({parsed: ast.args.if_chunk.args}, scope)
+    else if(
+      ast.args.else_block.args.else_middles.length > 0 &&
+      !interpreter.intDeclIfElseMiddle(ast.args.else_block.args.else_middles, scope) &&
+      ast.args.else_block
+    )
+      interpreter.parse({parsed: ast.args.else_block.args.else_end.args.args}, scope)
+  },
+
+  intDeclIfElseMiddle(ast, scope) {
+    return ast.reduce(function(acc, ast) {
+      if(acc) return acc;
+
+      const cond_ret = interpreter.intCondBlock(ast.args.cond, scope)
+      if(cond_ret)
+        interpreter.parse({parsed: ast.args.block.args}, scope)
+
+      return cond_ret
+    }, false)
+  },
+
+  intCondBlock(ast, scope) {
+    const ops = []
+    const exps = []
+
+    ast.args.value.parsed.args.forEach(function(arg, index) {
+      if(index & 1)
+        ops.push(arg)
+      else
+        exps.push(interpreter.intExpression(arg, scope))
+    })
+
+    return ops.reduce(function(acc, op, index) {
+      const exp = exps[index + 1]
+
+      if(op.args.value === '<')
+        return interpreter.intLogOpLT(acc, exp)
+
+      else if(op.args.value === '>')
+        return interpreter.intLogOpGT(acc, exp)
+
+      else if(op.args.value === '==')
+        return interpreter.intLogOpEQ(acc, exp)
+
+      else
+        throw new Error('Interpreter error (intCondBlock): ' + op.args.value)
+    }, exps[0])
+  },
+
+  intLogOpLT(val1, val2) {
+    return val1 < val2;
+  },
+
+  intLogOpGT(val1, val2) {
+    return val1 > val2;
+  },
+
+  intLogOpEQ(val1, val2) {
+    return val1 === val2;
   },
 
   intFuncDef(ast, scope) {
@@ -60,9 +128,12 @@ const interpreter = {
 
   intFuncCall(ast, scope) {
     if(!(ast.args.name.args.value in scope))
-      throw new ReferenceError(`"${ast.args.name.args.value}" is not a function`)
+      throw new ReferenceError(`"${ast.args.name.args.value}" is not defined`)
 
     const func = scope[ast.args.name.args.value]
+    if(typeof(func) !== 'function')
+      throw new TypeError(`"${ast.args.name.args.value}" is not a function`)
+
     const exps = interpreter.intFuncCallArgsChunk(ast.args.args, scope)
     return func.apply(null, exps)
   },
@@ -144,7 +215,7 @@ const interpreter = {
   intVariable(ast, scope) {
     if(ast.args.value in scope)
       return scope[ast.args.value]
-    throw new TypeError(`${ast.args.value} is not defined`)
+    throw new TypeError(`"${ast.args.value}" is not defined`)
   },
 
   intPrimitive(ast, scope) {
