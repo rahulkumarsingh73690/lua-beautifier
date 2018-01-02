@@ -27,7 +27,7 @@ f loop(f, start, end) {
 }
 
 f loop_f(start, end) {
-  print(start, "*", start, start * start)
+  print(start, "*", start, "=", start * start)
 }
 
 print(
@@ -35,3 +35,20 @@ print(
 )
 
 loop(loop_f, 0, 10)
+
+f iff(n) {
+  if(n == 1) {
+    return "IF"
+  } else(n == 2) {
+    return "ELSE MIDDLE 1"
+  } else(n == 3) {
+    return "ELSE MIDDLE 2"
+  } else {
+    return "ELSE"
+  }
+}
+
+print(iff(1))
+print(iff(2))
+print(iff(3))
+print(iff(4))

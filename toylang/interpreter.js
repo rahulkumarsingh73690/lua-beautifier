@@ -16,20 +16,8 @@ const interpreter = {
     scope = inheritGlobalScope(scope)
 
     return ast.parsed.args.value.reduce(function(acc, chunk) {
-      if(chunk.parsed.type === 'func_call')
-        interpreter.intFuncCall(chunk.parsed, scope)
-
-      else if(chunk.parsed.type === 'assign')
-        interpreter.intAssign(chunk.parsed, scope)
-
-      else if(chunk.parsed.type === 'func_def')
-        interpreter.intFuncDef(chunk.parsed, scope)
-
-      else if(chunk.parsed.type === 'decl_if')
-        interpreter.intDeclIf(chunk.parsed, scope)
-
-      else if(chunk.parsed.type === 'func_return')
-        return interpreter.intFuncReturn(chunk.parsed, scope)
+      if(chunk.parsed)
+        return interpreter.intExpression(chunk.parsed, scope)
 
       else
         throw new Error('Interpreter error (parse): ' + chunk.parsed.type)
@@ -40,24 +28,27 @@ const interpreter = {
     const cond_ret = interpreter.intCondBlock(ast.args.cond_block, scope)
 
     if(cond_ret)
-      interpreter.parse({parsed: ast.args.if_chunk.args}, scope)
-    else if(
-      ast.args.else_block.args.else_middles.length > 0 &&
-      !interpreter.intDeclIfElseMiddle(ast.args.else_block.args.else_middles, scope) &&
-      ast.args.else_block
-    )
-      interpreter.parse({parsed: ast.args.else_block.args.else_end.args.args}, scope)
+      return interpreter.parse({parsed: ast.args.if_chunk.args}, scope)
+
+    if(ast.args.else_block.args.else_middles.length > 0) {
+      const else_middle_ret = interpreter.intDeclIfElseMiddle(ast.args.else_block.args.else_middles, scope)
+      if(else_middle_ret && 'data' in else_middle_ret)
+        return else_middle_ret.data
+    }
+
+    if(ast.args.else_block.args.else_end)
+      return interpreter.parse({parsed: ast.args.else_block.args.else_end.args.args}, scope)
   },
 
   intDeclIfElseMiddle(ast, scope) {
     return ast.reduce(function(acc, ast) {
-      if(acc) return acc;
+      if(acc && acc.data) return acc;
 
       const cond_ret = interpreter.intCondBlock(ast.args.cond, scope)
       if(cond_ret)
-        interpreter.parse({parsed: ast.args.block.args}, scope)
-
-      return cond_ret
+        return {
+          data: interpreter.parse({parsed: ast.args.block.args}, scope)
+        }
     }, false)
   },
 
@@ -102,7 +93,7 @@ const interpreter = {
   },
 
   intFuncDef(ast, scope) {
-    scope[ast.args.name.args.value] = function() {
+    return scope[ast.args.name.args.value] = function() {
       const values = Array.from(arguments)
       const inner_scope = inheritGlobalScope(scope)
 
@@ -123,7 +114,7 @@ const interpreter = {
   },
 
   intAssign(ast, scope) {
-    scope[ast.args.left.args.value] = interpreter.intExpression(ast.args.right)
+    return scope[ast.args.left.args.value] = interpreter.intExpression(ast.args.right, scope)
   },
 
   intFuncCall(ast, scope) {
@@ -149,20 +140,42 @@ const interpreter = {
   },
 
   intExpression(ast, scope) {
-    if(ast.type === 'primitive')
-      return interpreter.intPrimitive(ast, scope)
+    let exp = new Error('Interpreter error (intExpression): ' + ast.type)
+
+    if(ast.type === 'func_call')
+      exp = interpreter.intFuncCall(ast, scope)
+
+    else if(ast.type === 'assign')
+      exp = interpreter.intAssign(ast, scope)
+
+    else if(ast.type === 'func_def')
+      exp = interpreter.intFuncDef(ast, scope)
+
+    else if(ast.type === 'decl_if')
+      exp = interpreter.intDeclIf(ast, scope)
+
+    else if(ast.type === 'primitive')
+      exp = interpreter.intPrimitive(ast, scope)
 
     else if(ast.type === 'variable')
-      return interpreter.intVariable(ast, scope)
+      exp = interpreter.intVariable(ast, scope)
 
     else if(ast.type === 'func_call')
-      return interpreter.intFuncCall(ast, scope)
+      exp = interpreter.intFuncCall(ast, scope)
 
     else if(ast.type === 'math_operation')
-      return interpreter.intMathOperation(ast, scope)
+      exp = interpreter.intMathOperation(ast, scope)
+
+    else if(ast.type === 'func_return')
+      exp = interpreter.intFuncReturn(ast, scope)
+
+    else if(ast.type === 'assign')
+      exp = interpreter.intAssign(ast, scope)
 
     else
-      throw new Error('Interpreter error (intExpression): ' + ast.type)
+      throw exp
+
+    return exp
   },
 
   intMathOperation(ast, scope) {

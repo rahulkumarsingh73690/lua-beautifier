@@ -8,7 +8,7 @@ function ensureArray(arg) {
 }
 
 function isReservedWord(word) {
-  return /^(return|if|else|true|false)/.test(word)
+  return /^(return|if|else|true|false)$/.test(word)
 }
 
 const isExtensibleExpression = (function() {
