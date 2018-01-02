@@ -24,7 +24,7 @@ const interpreter = {
     let ret = void 0
 
     return ast.parsed.args.value.reduce(function(acc, chunk, index) {
-      if(acc && 'ret' in acc)
+      if(acc && typeof(acc) === 'object' && 'ret' in acc)
         return acc
 
       else if(chunk.parsed) {
@@ -233,14 +233,12 @@ const interpreter = {
   },
 
   extExpression(ast, exp, scope) {
-    if(!(isExtensible(ast) && ast.exts.length))
+    if(!(isExtensible(ast) && ast.exts && ast.exts.length))
       return exp
 
     return ast.exts.reduce(function(acc, ext) {
       if(ext.type === 'extend_object') {
-        if(!(ext.args.args.value in acc))
-          throw new ReferenceError(`Property "${ext.args.args.value}" does not exist`)
-        return acc[ext.args.args.value]
+        return interpreter.intExpression(ext.args, acc)
 
       } else if(ext.type === 'extend_computed') {
         const index = interpreter.intExpression(ext.args, scope)
@@ -248,18 +246,15 @@ const interpreter = {
           throw new ReferenceError(`Property "${index}" does not exist`)
         return acc[index]
 
+      } else if(ext.type === 'func_call_args_chunk') {
+        const args = ext.args.args.exps.map(function(exp) {
+          return interpreter.intExpression(exp, scope)
+        })
+        return acc.apply(null, args)
+
       } else
         throw new Error('Interpreter error (extExpression): ' + ext.type)
     }, exp)
-
-    const ext = interpreter.intExpression(ast.exts[0].args, exp)
-
-    console.log('.'.repeat(10))
-    console.log(JSON.stringify(ast.exts,0,2))
-    console.log(exp)
-    console.log(ext)
-
-    return exp
   },
 
   intMathOperation(ast, scope) {
