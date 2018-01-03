@@ -1,16 +1,10 @@
 f f() {
-  obj = {
-    a = 123
+  a = 1
+  if(1) {
+    a = 2
+    print(a)
   }
-
-  return f f(s, n, v) {
-    if(s == "=") {
-      obj[n] = v
-    }
-    return obj
-  }
+  print(a)
 }
 
-g = f()
-print("=", g("!", 0, 0))
-print("=", g("=", "key", 1))
+f()
