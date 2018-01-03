@@ -92,6 +92,9 @@ const syntax = {
     if(!~ignore_chunks.indexOf('ext'))
       exp = syntax.extendExpression(exp)
 
+    if(exp)
+      exp.remain = removeEmptyLines(exp.remain)
+
     return exp
   },
 
@@ -124,7 +127,7 @@ const syntax = {
     if(!/^(\s*\.\s*)/.test(inst))
       return false
 
-    const exp = syntax.parseExpression(inst.substr(RegExp.$1.length), ['ext'])
+    const exp = syntax.parseExpression(inst.substr(RegExp.$1.length), ['ext', 'assign'])
     if(!exp)
       return false
 

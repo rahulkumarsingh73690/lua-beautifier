@@ -168,7 +168,28 @@ const interpreter = {
   },
 
   intAssign(ast, scope) {
-    return scope[ast.args.left.args.value] = interpreter.intExpression(ast.args.right, scope)
+    if(ast.args.left.exts.length > 0) {
+      let obj = ast.args.left.exts.slice(0, -1).reduce(function(acc, ext, index) {
+        if(ext.type === 'extend_object') {
+          return acc[ext.args.args.value]
+
+        } else if(ext.type === 'extend_computed') {
+          return acc[interpreter.intExpression(ext.args, scope)]
+
+        } else
+          throw new Error('Interpreter error (intAssign): ' + ext.type)
+      }, scope[ast.args.left.args.value])
+
+      const last_ext = ast.args.left.exts.slice(-1)[0]
+      if(last_ext.type === 'extend_object')
+        return obj[last_ext.args.args.value] = interpreter.intExpression(ast.args.right, scope)
+      else if(last_ext.type === 'extend_computed')
+        return obj[interpreter.intExpression(last_ext.args, scope)] = interpreter.intExpression(ast.args.right, scope)
+      else
+        throw new Error('Interpreter error (intAssign): ' + last_ext.type)
+
+    } else
+      return scope[ast.args.left.args.value] = interpreter.intExpression(ast.args.right, scope)
   },
 
   intFuncCall(ast, scope) {
