@@ -1,10 +1,12 @@
 f f() {
   a = 1
-  if(1) {
+  print(a)
+  if(a) {
     a = 2
-    print(a)
   }
   print(a)
 }
 
+a = 10
 f()
+print(a)

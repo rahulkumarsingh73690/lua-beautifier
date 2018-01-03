@@ -21,9 +21,9 @@ const global_scope = {
 const interpreter = {
   parse(ast, scope, options) {
     options = {
-      new_scope: options && options.new_scope
+      old_scope: options && options.old_scope
     }
-    scope = options.new_scope ? inheritGlobalScope(scope) : scope
+    scope = options.old_scope ? scope : inheritGlobalScope(scope)
     let ret = void 0
 
     return ast.parsed.args.value.reduce(function(acc, chunk, index) {
@@ -47,7 +47,7 @@ const interpreter = {
 
   intDeclIf(ast, scope) {
     const cond_ret = interpreter.intCondBlock(ast.args.cond_block, scope)
-    const parse_options = {new_scope: false}
+    const parse_options = {old_scope: true}
 
     if(cond_ret)
       return interpreter.parse({parsed: ast.args.if_chunk.args}, scope, parse_options)
@@ -63,7 +63,7 @@ const interpreter = {
   },
 
   intDeclIfElseMiddle(ast, scope) {
-    const parse_options = {new_scope: false}
+    const parse_options = {old_scope: true}
     return ast.reduce(function(acc, ast) {
       if(acc && acc.data) return acc;
 
