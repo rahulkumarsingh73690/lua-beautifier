@@ -709,7 +709,7 @@ const syntax = {
     variable = [ _a-z ] +
   */
   parseVariable(inst) {
-    if(!/^([_a-z]+)/.test(inst))
+    if(!/^([_a-z0-9]+)/.test(inst))
       return false
 
     if(isReservedWord(RegExp.$1))
@@ -934,10 +934,11 @@ const syntax = {
 
     const clean_chunks_remain = removeEmptyLines(chunks.remain)
     const ret = syntax.parseFuncDefChunkReturn(clean_chunks_remain)
-    if(ret) {
-      chunks.remain = ret.remain
-      chunks.parsed.args.value.push(ret)
-    }
+    if(!ret)
+      return false
+
+    chunks.remain = ret.remain
+    chunks.parsed.args.value.push(ret)
 
     return chunks
   },

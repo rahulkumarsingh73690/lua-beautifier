@@ -1,7 +1,6 @@
 
 const toylang = {
   run(code) {
-    const t = -Date.now()
     const ast = toylang.syntax.parse(code)
     const syntax_vars = {
       eval: function(code) {
@@ -9,7 +8,6 @@ const toylang = {
       }
     }
     const interpreted = toylang.interpreter.parse(ast, syntax_vars)
-    console.log('Duration', t + Date.now(), 'ms')
     return interpreted
   },
 

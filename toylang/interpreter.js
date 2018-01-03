@@ -14,8 +14,57 @@ const isExtensible = (function isExtensible(exp) {
   }
 })()
 
+const valid_iters = 'map filter reduce'.split(' ')
+function iter(iter_name, subject, callback, init) {
+  if(!(typeof(callback) === 'function'))
+    return []
+
+  if(~valid_iters.indexOf(iter_name)) {
+    if(Array.isArray(subject))
+      return subject[iter_name](function(item, index) {
+        return callback(item, index)
+      })
+
+    if(subject && typeof(subject) === 'object') {
+      const keys = Object.keys(subject)
+      return keys[iter_name](function(key) {
+        return callback(subject[key], key)
+      }, init)
+    }
+
+    throw new TypeError(iter_name + ' accepts only arrays or objects.')
+  }
+
+  throw new Error('Interpreter error (iter): ' + iter_name)
+}
+
 const global_scope = {
-  print: console.log.bind(console)
+  // global
+  print: console.log.bind(console),
+  type: function(value) {
+    return Array.isArray(value) ? 'array' : typeof value
+  },
+
+  // loop
+  map: function(callback, array) {
+    return iter('map', array, callback)
+  },
+  reduce: function(callback, array, init) {
+    return iter('reduce', array, callback, init)
+  },
+  filter: function(callback, array) {
+    return iter('filter', array, callback)
+  },
+
+  // array
+  arr_length: function(array) {
+    return Array.isArray(array) ? array.length : 0
+  },
+
+  // object
+  obj_keys: function(object) {
+    return object && typeof(object) === 'object' ? Object.keys(object) : []
+  }
 }
 
 const interpreter = {
