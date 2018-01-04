@@ -259,13 +259,39 @@ const global_scope = {
   },
 
   // array
-  arr_length: function(array) {
-    return Array.isArray(array) ? array.length : 0
+  length: function(subject) {
+    return typeof(subject) === 'string' || Array.isArray(subject) ? subject.length : 0
   },
 
   // object
   obj_keys: function(object) {
     return object && typeof(object) === 'object' ? Object.keys(object) : []
+  },
+
+  // string
+  str_starts_with: function(string, starts_with) {
+    return string.startsWith(starts_with)
+  },
+  str_ends_with: function(string, starts_with) {
+    return string.endsWith(starts_with)
+  },
+  str_slice: function(string, start, end) {
+    return string.slice(start, end)
+  },
+  str_char2code: function(char) {
+    return char.charCodeAt(0)
+  },
+  str_code2char: function(code) {
+    return String.fromCharCode(code)
+  },
+  str_repeat: function(string, amount) {
+    return string.repeat(amount)
+  },
+  str_index: function(string, find) {
+    return string.indexOf(find)
+  },
+  str_contains: function(string, find) {
+    return !!~string.indexOf(find)
   }
 }
 

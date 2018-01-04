@@ -754,7 +754,7 @@ const syntax = {
       return false
 
     const quoted_string = RegExp.$1
-    const string = RegExp.$2
+    const string = syntax.parsePrimitiveStringSpecialCharacters(RegExp.$2)
     const remain = inst.substr(quoted_string.length)
 
     return {
@@ -767,6 +767,18 @@ const syntax = {
         }
       }
     }
+  },
+
+  parsePrimitiveStringSpecialCharacters(string) {
+    return string.replace(/([^~])~n/g, '$1\n')
+      .replace(/([^~])~t/g, '$1\t')
+      .replace(/([^~])~r/g, '$1\r')
+      .replace(/([^~])~f/g, '$1\f')
+      .replace(/([^~])~b/g, '$1\b')
+      .replace(/([^~])~v/g, '$1\v')
+      .replace(/([^~])~x([0-9a-f]{2})/g, function(_, char_code) { return String.fromCharCode(parseInt(char_code, 16)) })
+      .replace(/([^~])~u([0-9a-f]{4})/g, function(_, char_code) { return String.fromCharCode(parseInt(char_code, 16)) })
+      .replace(/~~/g, '~')
   },
 
   parsePrimitiveBoolean(inst) {
