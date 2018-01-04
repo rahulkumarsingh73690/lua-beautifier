@@ -1,29 +1,3 @@
 
-array = [1, "2", true, [], {}]
-
-object = {
-  id_1 = {
-    name = "dan";
-    age = 10
-  };
-  id_2 = {
-    name = "nad";
-    age = 1
-  }
-}
-
-s = map(f f(item, index) {
-  print("item", item, "index", index)
-  return map(f f(item, index) {
-    return item
-  }, item)
-}, object)
-
-print("=", s)
-
-r = map(f f(item, index) {
-  print("item", item, "index", index)
-  return type(item)
-}, array)
-
-print("=", r)
+print("test\n\tte'st")
+print('test\n\tte"st')

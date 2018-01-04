@@ -750,7 +750,7 @@ const syntax = {
   },
 
   parsePrimitiveString(inst) {
-    if(!/^("([^"]*)")/.test(inst))
+    if(!(/^("([^"]*)")/.test(inst) || /^('([^']*)')/.test(inst)))
       return false
 
     const quoted_string = RegExp.$1
