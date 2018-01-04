@@ -709,7 +709,7 @@ const syntax = {
     variable = [ _a-z ] +
   */
   parseVariable(inst) {
-    if(!/^([_a-z0-9]+)/.test(inst))
+    if(!/^([a-z]+(\-?[_a-z0-9]+)*)/.test(inst))
       return false
 
     if(isReservedWord(RegExp.$1))

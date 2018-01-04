@@ -1,4 +1,9 @@
 
+const https = require('https')
+const http = require('http')
+const fs = require('fs')
+const path = require('path')
+
 function ensureObject(obj) {
   return obj && typeof(obj) === 'object' ? obj : {}
 }
@@ -38,11 +43,177 @@ function iter(iter_name, subject, callback, init) {
   throw new Error('Interpreter error (iter): ' + iter_name)
 }
 
+function request(protocol) {
+  return function(options, callback) {
+    const cb = (function() {
+      let result = 0
+      return function(error, data) {
+        if(result) return false
+        result = 1
+        return callback(error, data)
+      }
+    })()
+
+    try {
+      const request = protocol.request(options, function(response) {
+        let data = ''
+        response.setEncoding('utf-8')
+        response.on('error', function(error) {
+          cb(0, data)
+        })
+        response.on('data', buffer => data += buffer)
+        response.on('end', function() {
+          cb(0, data)
+        })
+      })
+      request.end()
+      request.on('error', function(error) {
+        cb(error, 0)
+      })
+    } catch(error) {
+      cb(error, 0)
+      return false
+    }
+
+    return true
+  }
+}
+
 const global_scope = {
   // global
   print: console.log.bind(console),
   type: function(value) {
     return Array.isArray(value) ? 'array' : typeof value
+  },
+
+  // json
+  json2obj: function(json, callback) {
+    try {
+      return callback(0, JSON.parse(json))
+    } catch(error) {
+      return callback(error, 0)
+    }
+  },
+
+  obj2json: function(obj, callback) {
+    try {
+      return callback(0, JSON.stringify(obj))
+    } catch(error) {
+      return callback(error, 0)
+    }
+  },
+
+  // net
+  https_request: request(https),
+  http_request: request(http),
+
+  // disk file
+  file_read: function(full_path, callback) {
+    try {
+      full_path = path.resolve(full_path)
+      fs.readFile(full_path, 'utf-8', function(error, data) {
+        if(error)
+          callback(error, 0)
+        else
+          callback(0, {data: data.toString(), full_path})
+      })
+      return true
+    } catch(error) {
+      callback(error, 0)
+      return false
+    }
+  },
+  file_write: function(full_path, data, callback) {
+    try {
+      full_path = path.resolve(full_path)
+      fs.writeFile(full_path, data, function(error, data) {
+        if(error)
+          callback(error, 0)
+        else
+          callback(0, {full_path})
+      })
+      return true
+    } catch(error) {
+      callback(error, 0)
+      return false
+    }
+  },
+  file_delete: function(full_path, callback) {
+    try {
+      full_path = path.resolve(full_path)
+      fs.unlink(full_path, function(error, data) {
+        if(error)
+          callback(error, 0)
+        else
+          callback(0, {full_path})
+      })
+      return true
+    } catch(error) {
+      callback(error, 0)
+      return false
+    }
+  },
+  file_append: function(full_path, data, callback) {
+    try {
+      full_path = path.resolve(full_path)
+      fs.appendFile(full_path, data, function(error, data) {
+        if(error)
+          callback(error, 0)
+        else
+          callback(0, {full_path})
+      })
+      return true
+    } catch(error) {
+      callback(error, 0)
+      return false
+    }
+  },
+
+  // disk dir
+  dir_create: function(dir, callback) {
+    try {
+      dir = path.resolve(dir)
+      fs.mkdir(dir, function(error, content) {
+        if(error)
+          callback(error, 0)
+        else
+          callback(0, {dir})
+      })
+      return true
+    } catch(error) {
+      callback(error, 0)
+      return false
+    }
+  },
+  dir_delete: function(dir, callback) {
+    try {
+      dir = path.resolve(dir)
+      fs.rmdir(dir, function(error, content) {
+        if(error)
+          callback(error, 0)
+        else
+          callback(0, {dir})
+      })
+      return true
+    } catch(error) {
+      callback(error, 0)
+      return false
+    }
+  },
+  dir_read: function(dir, callback) {
+    try {
+      dir = path.resolve(dir)
+      fs.readdir(dir, function(error, content) {
+        if(error)
+          callback(error, 0)
+        else
+          callback(0, {dir})
+      })
+      return true
+    } catch(error) {
+      callback(error, 0)
+      return false
+    }
   },
 
   // loop

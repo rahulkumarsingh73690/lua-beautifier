@@ -1,3 +1,122 @@
 
-print("test\n\tte'st")
-print('test\n\tte"st')
+http_url = 'http://api-notification.argos4.me/'
+https_url = 'https://yesno.wtf/api'
+
+print('requesting...', https_url)
+
+https_request(https_url, f f(error, data) {
+  if(error) {
+    print("error https", https_url, error)
+  } else {
+    print("success https", https_url, data)
+
+    json2obj(data, f g(error, obj) {
+      if(error) {
+        print("error json2obj", https_url, error)
+      } else {
+        print("success json2obj", https_url, obj)
+
+        file_write('./https.response.txt', data, f f(error, result) {
+          print('file write', error, result)
+
+          file_append('./https.response.txt', "-append", f f(error, result) {
+            print('file append', error, result)
+
+            file_read('./https.response.txt', f f(error, data) {
+              print('file read', error, data)
+
+              file_delete('./https.response.txt', f f(error, result) {
+                print('file delete', error, result)
+                return 0
+              })
+
+              return 0
+            })
+
+            return 0
+          })
+
+          return 0
+        })
+      }
+
+      return 0
+    })
+  }
+
+  return 0
+})
+
+print('requesting...', http_url)
+
+http_request(http_url, f f(error, data) {
+  if(error) {
+    print("error http", http_url, error)
+  } else {
+    print("success http", http_url, data)
+
+    json2obj(data, f g(error, obj) {
+      if(error) {
+        print("error json2obj", http_url, error)
+      } else {
+        print("success json2obj", http_url, obj)
+
+        file_write('./http.response.txt', data, f f(error, result) {
+          print('file write', error, result)
+
+          file_append('./http.response.txt', "-append", f f(error, result) {
+            print('file append', error, result)
+
+            file_read('./http.response.txt', f f(error, data) {
+              print('file read', error, data)
+
+              file_delete('./http.response.txt', f f(error, result) {
+                print('file delete', error, result)
+                return 0
+              })
+
+              return 0
+            })
+
+            return 0
+          })
+          return 0
+        })
+      }
+
+      return 0
+    })
+  }
+
+  return 0
+})
+
+dir_create('./dir', f f(error, result) {
+  if(error) {
+    print('dir create error', error, result)
+  } else {
+    print('dir create success', error, result)
+
+    dir_read('.', f f(error, result) {
+      if(error) {
+        print('dir read error', error, result)
+      } else {
+        print('dir read success', error, result)
+      }
+
+      dir_delete('./dir', f f(error, result) {
+        if(error) {
+          print('dir delete error', error, result)
+        } else {
+          print('dir delete success', error, result)
+        }
+
+        return 0
+      })
+
+      return 0
+    })
+  }
+
+  return 0
+})
