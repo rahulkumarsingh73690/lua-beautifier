@@ -2,6 +2,7 @@
 const https = require('https')
 const http = require('http')
 const fs = require('fs')
+const util = require('util')
 const path = require('path')
 
 function ensureObject(obj) {
@@ -79,6 +80,35 @@ function request(protocol) {
   }
 }
 
+function http_server(protocol) {
+  return function(options) {
+    options = {
+      request: options.request,
+      server: options.server
+    }
+
+    const server = http.createServer(function(request, response) {
+      try {
+        let data = ''
+        request.setEncoding('utf-8')
+        request.on('data', function(buffer) { data += buffer })
+        request.on('end', function() {
+          response.end(options.request.reply(request, data))
+        })
+      } catch(error) {
+        response.end(options.request.onerror(error, request))
+      }
+    })
+    server.timeout = 0
+    server.on('error', options.server.onerror)
+    server.listen(options.server.port, function() {
+      options.server.oncreate(options)
+    })
+
+    return server
+  }
+}
+
 const global_scope = {
   // global
   print: console.log.bind(console),
@@ -106,6 +136,7 @@ const global_scope = {
   // net
   https_request: request(https),
   http_request: request(http),
+  http_server: http_server(http),
 
   // disk file
   file_read: function(full_path, callback) {
