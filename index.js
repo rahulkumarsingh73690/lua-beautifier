@@ -1,7 +1,8 @@
 
 const fs = require('fs')
 const path = require('path')
-const code = fs.readFileSync(path.resolve(process.argv[3])).toString()
+const filename = process.argv[3]
+const code = fs.readFileSync(path.resolve(filename)).toString()
 const toylang = require('./toylang/')
 const syntax = toylang.syntax
 
@@ -14,31 +15,34 @@ for(const prop in syntax) {
   const orig = syntax[prop]
 
   syntax[prop] = (...args) => {
-    var sp = space.repeat(repeat_spaces)
+    if(log_enabled) {
+      var sp = space.repeat(repeat_spaces)
 
-    log('='.repeat(100))
-    props.push(prop)
-    log(props.join('\t'))
-    log(JSON.stringify(args, 0, 2).replace(/^(.)/gm, sp + '$1'))
+      log('='.repeat(100))
+      props.push(prop)
+      log(props.join('\t'))
+      log(JSON.stringify(args, 0, 2).replace(/^(.)/gm, sp + '$1'))
 
-    repeat_spaces++
-    const ret = orig(...args)
-    props.pop()
-    const json_ret = JSON.stringify(ret, 0, 2)
+      repeat_spaces++
+      props.pop()
+      const json_ret = JSON.stringify(ret, 0, 2)
 
-    log(sp + 'RETURN', prop)
-    if(json_ret)
-      log(json_ret.replace(/^(.)/gm, sp + '$1'))
-    else
-      log(sp + json_ret)
+      log(sp + 'RETURN', prop)
+      if(json_ret)
+        log(json_ret.replace(/^(.)/gm, sp + '$1'))
+      else
+        log(sp + json_ret)
 
-    repeat_spaces--
-    return ret
+      repeat_spaces--
+      return ret
+    } else {
+      return orig(...args)
+    }
   }
 }
 
 if(process.argv[2] === 'run') {
-  toylang.run(code)
+  toylang.run(filename)
 } else if(process.argv[2] === 'ast') {
   console.log('Parsing...')
   const ast = toylang.syntax.parse(code)

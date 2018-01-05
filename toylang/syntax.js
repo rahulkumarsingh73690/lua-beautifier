@@ -38,7 +38,7 @@ const syntax = {
     const chunks = []
     let chunk = null
     let code_inst = inst
-    let max_chunks = 20
+    let max_chunks = 40
 
     while(max_chunks--) {
       chunk = syntax.parseExpression(code_inst) || syntax.parseDeclaration(code_inst)

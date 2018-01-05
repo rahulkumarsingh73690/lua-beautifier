@@ -4,6 +4,8 @@ const http = require('http')
 const fs = require('fs')
 const util = require('util')
 const path = require('path')
+const url = require('url')
+const querystring = require('querystring')
 
 function ensureObject(obj) {
   return obj && typeof(obj) === 'object' ? obj : {}
@@ -27,9 +29,9 @@ function iter(iter_name, subject, callback, init) {
 
   if(~valid_iters.indexOf(iter_name)) {
     if(Array.isArray(subject))
-      return subject[iter_name](function(item, index) {
-        return callback(item, index)
-      })
+      return subject[iter_name](function(item, index, index2) {
+        return iter_name === 'reduce' ? callback(item, index, index2) : callback(item, index)
+      }, init)
 
     if(subject && typeof(subject) === 'object') {
       const keys = Object.keys(subject)
@@ -89,11 +91,35 @@ function http_server(protocol) {
 
     const server = http.createServer(function(request, response) {
       try {
+        const parsed_url = url.parse(request.url)
+        const req = {
+          url: request.url,
+          method: request.method,
+          headers: request.headers,
+          pathname: parsed_url.pathname,
+          query: querystring.parse(parsed_url.query)
+        }
         let data = ''
         request.setEncoding('utf-8')
         request.on('data', function(buffer) { data += buffer })
         request.on('end', function() {
-          response.end(options.request.reply(request, data))
+          req.payload = data
+          req.json = {}
+          req.is_json = false
+
+          try {
+            req.json = JSON.parse(data)
+            req.is_json = true
+          } catch(error) {}
+
+          options.request.reply(req, function(data, headers, status_code) {
+            if(!util.isObject(headers))
+              headers = {}
+            if(!util.isNumber(status_code))
+              status_code = 200
+            response.writeHead(status_code, headers)
+            response.end(data)
+          })
         })
       } catch(error) {
         response.end(options.request.onerror(error, request))
@@ -111,9 +137,20 @@ function http_server(protocol) {
 
 const global_scope = {
   // global
-  print: console.log.bind(console),
+  print: function() {
+    console.log.apply(console, Array.from(arguments))
+    return true
+  },
   type: function(value) {
     return Array.isArray(value) ? 'array' : typeof value
+  },
+  contains: function(subject, find) {
+    return !!~subject.indexOf(find)
+  },
+
+  // date
+  date: function() {
+    return new Date
   },
 
   // json
@@ -137,6 +174,9 @@ const global_scope = {
   https_request: request(https),
   http_request: request(http),
   http_server: http_server(http),
+
+  // math
+  rand: function() { return Math.random() },
 
   // disk file
   file_read: function(full_path, callback) {
@@ -262,6 +302,20 @@ const global_scope = {
   length: function(subject) {
     return typeof(subject) === 'string' || Array.isArray(subject) ? subject.length : 0
   },
+  arr_push: function(array, item) {
+    return array.push(item)
+  },
+  arr_pop: function(array) {
+    return array.pop()
+  },
+  arr_replace: function(array, start_range, end_range, new_value) {
+    array.splice(start_range, end_range, new_value)
+    return array
+  },
+  arr_remove: function(array, start_range, end_range) {
+    array.splice(start_range, end_range)
+    return array
+  },
 
   // object
   obj_keys: function(object) {
@@ -269,6 +323,7 @@ const global_scope = {
   },
 
   // string
+  str_rand: function() { return Math.random().toString(36).substr(2) },
   str_starts_with: function(string, starts_with) {
     return string.startsWith(starts_with)
   },
@@ -289,16 +344,15 @@ const global_scope = {
   },
   str_index: function(string, find) {
     return string.indexOf(find)
-  },
-  str_contains: function(string, find) {
-    return !!~string.indexOf(find)
   }
 }
 
 const interpreter = {
   parse(ast, scope, options) {
     options = {
-      old_scope: options && options.old_scope
+      old_scope: options && options.old_scope,
+      via: options && options.via,
+      filename: options && options.filename
     }
     scope = options.old_scope ? scope : inheritGlobalScope(scope)
     let ret = void 0
@@ -430,10 +484,10 @@ const interpreter = {
   intFuncDef(ast, scope) {
     return scope[ast.args.name.args.value] = function() {
       const values = Array.from(arguments)
-      const inner_scope = inheritGlobalScope(scope)
+      const inner_scope = inheritGlobalScope(scope,{old_scope:false})
 
       if(ast.args.args.args.args.args.length !== values.length)
-        throw new TypeError(`"${ast.args.args.args.args.args.length}" arguments are expected but "${values.length}" were provided.`)
+        throw new TypeError(`"${ast.args.name.args.value}": "${ast.args.args.args.args.args.length}" arguments are expected but "${values.length}" were provided.`)
 
       values.forEach(function(value, index) {
         const var_name = ast.args.args.args.args.args[index].args.value
@@ -475,10 +529,10 @@ const interpreter = {
   },
 
   intFuncCall(ast, scope) {
-    if(!(ast.args.name.args.value in scope))
+    if(!(ast.args.name.args.value in scope || ast.args.name.args.value in global_scope))
       throw new ReferenceError(`"${ast.args.name.args.value}" is not defined`)
 
-    const func = scope[ast.args.name.args.value]
+    const func = scope[ast.args.name.args.value] || global_scope[ast.args.name.args.value]
     if(typeof(func) !== 'function')
       throw new TypeError(`"${ast.args.name.args.value}" is not a function`)
 
@@ -541,7 +595,7 @@ const interpreter = {
 
     return ast.exts.reduce(function(acc, ext) {
       if(ext.type === 'extend_object') {
-        return interpreter.intExpression(ext.args, acc)
+        return interpreter.intExpression(ext.args, {...scope, ...acc})
 
       } else if(ext.type === 'extend_computed') {
         const index = interpreter.intExpression(ext.args, scope)
@@ -642,7 +696,7 @@ const interpreter = {
   },
 
   intBoolean(ast, scope) {
-    return Boolean(ast.value)
+    return ast.value === 'true'
   },
 
   intArray(ast, scope) {
