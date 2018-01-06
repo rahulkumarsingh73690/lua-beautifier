@@ -30,7 +30,7 @@ const syntax = {
   },
 
   parse(code) {
-    const ast = syntax.parseChunks(code)
+    const ast = syntax.parseChunks(code, 'global')
     if(ast.remain)
       syntax.throwError(ast)
     return ast
@@ -41,14 +41,14 @@ const syntax = {
     throw new SyntaxError('Unexpected token somewhere (NYI)')
   },
 
-  parseChunks(inst) {
+  parseChunks(inst, scope_name) {
     const chunks = []
     let chunk = null
     let code_inst = inst
     let max_chunks = 40
 
     while(max_chunks--) {
-      chunk = syntax.parseExpression(code_inst) || syntax.parseDeclaration(code_inst)
+      chunk = syntax.parseExpression(code_inst) || syntax.parseDeclaration(code_inst, scope_name)
 
       if(!chunk)
         break
@@ -179,13 +179,13 @@ const syntax = {
   /*
     decl = if
   */
-  parseDeclaration(inst) {
+  parseDeclaration(inst, scope_name) {
     inst = removeEmptyLines(inst)
 
     if(!inst)
       return false
 
-    let decl = syntax.parseDeclarationIf(inst)
+    let decl = syntax.parseDeclarationIf(inst, scope_name)
     if(decl)
       return decl
 
@@ -211,7 +211,7 @@ const syntax = {
 
     else_end = "else" if_chunk_block
   */
-  parseDeclarationIf(inst) {
+  parseDeclarationIf(inst, scope_name) {
     if(!/^(\s*if\s*)/.test(inst))
       return false
 
@@ -219,11 +219,11 @@ const syntax = {
     if(!cond_block)
       return false
 
-    const if_chunk = syntax.parseDeclarationIfChunkBlock(cond_block.remain)
+    const if_chunk = syntax.parseDeclarationIfChunkBlock(cond_block.remain, scope_name)
     if(!if_chunk)
       return false
 
-    const else_block = syntax.parseDeclarationIfElse(if_chunk.remain)
+    const else_block = syntax.parseDeclarationIfElse(if_chunk.remain, scope_name)
 
     return {
       original: inst,
@@ -246,17 +246,17 @@ const syntax = {
 
     else_end = "else" if_chunk_block
   */
-  parseDeclarationIfElse(inst) {
+  parseDeclarationIfElse(inst, scope_name) {
     const else_middles = []
     let else_middle = null
     let code_inst = inst
 
-    while(else_middle = syntax.parseDeclarationIfElseMiddle(code_inst)) {
+    while(else_middle = syntax.parseDeclarationIfElseMiddle(code_inst, scope_name)) {
       else_middles.push(else_middle.parsed)
       code_inst = else_middle.remain
     }
 
-    let else_end = syntax.parseDeclarationIfElseEnd(else_middle ? else_middle.remain : code_inst)
+    let else_end = syntax.parseDeclarationIfElseEnd(else_middle ? else_middle.remain : code_inst, scope_name)
     if(!else_end) {
       let remain = code_inst
 
@@ -291,7 +291,7 @@ const syntax = {
   /*
     else_middle = "else" if_cond_block if_chunk_block
   */
-  parseDeclarationIfElseMiddle(inst) {
+  parseDeclarationIfElseMiddle(inst, scope_name) {
     if(!/^(\s*else\s*)/.test(inst))
       return false
 
@@ -299,7 +299,7 @@ const syntax = {
     if(!else_cond)
       return false
 
-    let else_block = syntax.parseDeclarationIfChunkBlock(else_cond.remain)
+    let else_block = syntax.parseDeclarationIfChunkBlock(else_cond.remain, scope_name)
     if(!else_block)
       return false
 
@@ -319,11 +319,11 @@ const syntax = {
   /*
     else_end = "else" if_chunk_block
   */
-  parseDeclarationIfElseEnd(inst) {
+  parseDeclarationIfElseEnd(inst, scope_name) {
     if(!/^(\s*else\s*)/.test(inst))
       return false
 
-    let else_block = syntax.parseDeclarationIfChunkBlock(inst.substr(RegExp.$1.length))
+    let else_block = syntax.parseDeclarationIfChunkBlock(inst.substr(RegExp.$1.length), scope_name)
     if(!else_block)
       return false
 
@@ -340,26 +340,30 @@ const syntax = {
   /*
     if_chunk_block = "{" if_chunk "}"
   */
-  parseDeclarationIfChunkBlock(inst) {
+  parseDeclarationIfChunkBlock(inst, scope_name) {
     if(!/^(\s*\{\s*)/.test(inst))
       return false
 
     let code_inst = inst.substr(RegExp.$1.length)
-    let if_chunk = syntax.parseDeclarationIfChunk(code_inst)
+    let if_chunk = syntax.parseDeclarationIfChunk(code_inst, scope_name)
     if(if_chunk)
       code_inst = if_chunk.remain
     else
       if_chunk = {
         remain: code_inst,
         parsed: {
+          type: 'chunks',
           args: {
             value: []
           }
         }
       }
 
+    if(if_chunk.parsed.args.value.length < 1)
+      return false
+
     code_inst = removeEmptyLines(code_inst)
-    const ret = syntax.parseFuncDefChunkReturn(code_inst)
+    const ret = syntax.parseFuncDefChunkReturn(code_inst, scope_name)
     if(ret) {
       if_chunk.remain = ret.remain
       if_chunk.parsed.args.value.push(ret)
@@ -381,8 +385,8 @@ const syntax = {
   /*
     if_chunk = chunk
   */
-  parseDeclarationIfChunk(inst, ignore_chunks) {
-    return syntax.parseChunks(inst, ignore_chunks)
+  parseDeclarationIfChunk(inst, scope_name) {
+    return syntax.parseChunks(inst, scope_name)
   },
 
   /*
@@ -981,23 +985,57 @@ const syntax = {
     }
   },
 
-  parseFuncDefChunk(inst, ignore_chunks) {
-    const chunks = syntax.parseChunks(inst, ignore_chunks)
+  parseFuncDefChunk(inst) {
+    const scope_name = 'func_def'
+    const chunks = syntax.parseChunks(inst, scope_name)
     if(!chunks)
       return false
 
     const clean_chunks_remain = removeEmptyLines(chunks.remain)
-    const ret = syntax.parseFuncDefChunkReturn(clean_chunks_remain)
-    if(!ret)
+    const ret = syntax.parseFuncDefChunkReturn(clean_chunks_remain, scope_name)
+    if(ret) {
+      chunks.remain = ret.remain
+      chunks.parsed.args.value.push(ret)
+    } else
+      chunks.remain = clean_chunks_remain
+
+    if(chunks.parsed.args.value.length < 1)
       return false
 
-    chunks.remain = ret.remain
-    chunks.parsed.args.value.push(ret)
+    const last_chunk = chunks.parsed.args.value[chunks.parsed.args.value.length - 1]
+    if(last_chunk.parsed.type === 'func_return')
+      return chunks
 
-    return chunks
+    if(last_chunk.parsed.type === 'decl_if') {
+      if(!last_chunk.parsed.args.else_block.args.else_end)
+        return false
+      const last_if_chunk = last_chunk.parsed.args.if_chunk.args.args.value[last_chunk.parsed.args.if_chunk.args.args.value.length - 1]
+
+      const else_end_last_chunk = [
+        last_chunk.parsed.args.else_block.args.else_end.args.args.args.value[last_chunk.parsed.args.else_block.args.else_end.args.args.args.value.length - 1]
+      ]
+
+      const elses_middle_last_chunks = last_chunk.parsed.args.else_block.args.else_middles.map(function(else_middle) {
+        return else_middle.args.block.args.args.value[else_middle.args.block.args.args.value.length - 1]
+      })
+
+      const last_if_else_chunks = [last_if_chunk].concat(else_end_last_chunk, elses_middle_last_chunks)
+
+      if(
+        last_if_else_chunks.every(function(last_chunk) {
+          return last_chunk.parsed.type === 'func_return'
+        })
+      )
+        return chunks
+    }
+
+    return false
   },
 
-  parseFuncDefChunkReturn(inst) {
+  parseFuncDefChunkReturn(inst, scope_name) {
+    if(scope_name === 'global')
+      return false
+
     if(!/^(return\s+)/.test(inst))
       return false
 

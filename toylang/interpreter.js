@@ -288,13 +288,13 @@ const global_scope = {
   },
 
   // loop
-  map: function(callback, array) {
+  map: function(array, callback) {
     return iter('map', array, callback)
   },
-  reduce: function(callback, array, init) {
+  reduce: function(array, callback, init) {
     return iter('reduce', array, callback, init)
   },
-  filter: function(callback, array) {
+  filter: function(array, callback) {
     return iter('filter', array, callback)
   },
 
@@ -315,6 +315,9 @@ const global_scope = {
   arr_remove: function(array, start_range, end_range) {
     array.splice(start_range, end_range)
     return array
+  },
+  arr_sort: function(array) {
+    return array.sort()
   },
 
   // object
@@ -344,6 +347,12 @@ const global_scope = {
   },
   str_index: function(string, find) {
     return string.indexOf(find)
+  },
+  str_upper: function(string) {
+    return string.toUpperCase()
+  },
+  str_lower: function(string) {
+    return string.toLowerCase()
   }
 }
 
@@ -411,74 +420,77 @@ const interpreter = {
     const exps = []
 
     ast.args.value.parsed.args.forEach(function(arg, index) {
-      if(index & 1)
-        ops.push(arg)
-      else
-        exps.push(interpreter.intExpression(arg, scope))
+      (index & 1 ? ops : exps).push(arg)
     })
 
     return ops.reduce(function(acc, op, index) {
       const exp = exps[index + 1]
 
       if(op.args.value === '<')
-        return interpreter.intLogOpLT(acc, exp)
+        return interpreter.intLogOpLT(acc, exp, scope)
 
       else if(op.args.value === '>')
-        return interpreter.intLogOpGT(acc, exp)
+        return interpreter.intLogOpGT(acc, exp, scope)
 
       else if(op.args.value === '==')
-        return interpreter.intLogOpEQ(acc, exp)
+        return interpreter.intLogOpEQ(acc, exp, scope)
 
       else if(op.args.value === '!=')
-        return interpreter.intLogOpNEQ(acc, exp)
+        return interpreter.intLogOpNEQ(acc, exp, scope)
 
       else if(op.args.value === '>=')
-        return interpreter.intLogOpGTE(acc, exp)
+        return interpreter.intLogOpGTE(acc, exp, scope)
 
       else if(op.args.value === '<=')
-        return interpreter.intLogOpLTE(acc, exp)
+        return interpreter.intLogOpLTE(acc, exp, scope)
 
-      else if(op.args.value === '&&')
-        return interpreter.intLogOpAND(acc, exp)
+      else if(op.args.value === 'and')
+        return interpreter.intLogOpAND(acc, exp, scope)
 
-      else if(op.args.value === '||')
-        return interpreter.intLogOpOR(acc, exp)
+      else if(op.args.value === 'or')
+        return interpreter.intLogOpOR(acc, exp, scope)
 
       else
         throw new Error('Interpreter error (intCondBlock): ' + op.args.value)
-    }, exps[0])
+    }, interpreter.intExpression(exps[0], scope))
   },
 
-  intLogOpAND(val1, val2) {
-    return val1 && val2;
+  intLogOpAND(val1, exp, scope) {
+    return val1 && interpreter.intExpression(exp, scope);
   },
 
-  intLogOpOR(val1, val2) {
-    return val1 || val2;
+  intLogOpOR(val1, exp, scope) {
+    return val1 || interpreter.intExpression(exp, scope);
   },
 
-  intLogOpLTE(val1, val2) {
-    return val1 <= val2;
+  intLogOpLTE(val1, exp, scope) {
+    const val2 = interpreter.intExpression(exp, scope)
+    return val1 !== false && val1 <= val2 ? val2 : false;
   },
 
-  intLogOpGTE(val1, val2) {
-    return val1 >= val2;
+  intLogOpGTE(val1, exp, scope) {
+    const val2 = interpreter.intExpression(exp, scope)
+    return val1 !== false && val1 >= val2 ? val2 : false;
   },
 
-  intLogOpNEQ(val1, val2) {
-    return val1 !== val2;
+  intLogOpNEQ(val1, exp, scope) {
+    const val2 = interpreter.intExpression(exp, scope)
+    return val1 !== false && val1 !== val2 ? val2 : false;
   },
 
-  intLogOpLT(val1, val2) {
-    return val1 < val2;
+  intLogOpLT(val1, exp, scope) {
+    const val2 = interpreter.intExpression(exp, scope)
+    return val1 !== false && val1 < val2 ? val2 : false;
   },
 
-  intLogOpGT(val1, val2) {
-    return val1 > val2;
+  intLogOpGT(val1, exp, scope) {
+    const val2 = interpreter.intExpression(exp, scope)
+    return val1 !== false && val1 > val2 ? val2 : false;
   },
 
-  intLogOpEQ(val1, val2) {
-    return val1 === val2;
+  intLogOpEQ(val1, exp, scope) {
+    const val2 = interpreter.intExpression(exp, scope)
+    return val1 !== false && val1 === val2 ? val2 : false;
   },
 
   intFuncDef(ast, scope) {

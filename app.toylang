@@ -194,9 +194,9 @@ f add_user(new_user, success_cb, error_cb) {
 
 f update_user_by_id(id, new_user_data, success_cb, error_cb) {
   return get_user_by_id(id, f success(result) {
-    map(f f(value, key) {
+    map(new_user_data, f f(value, key) {
       return result.user[key] = value
-    }, new_user_data)
+    })
     
     return load_users(f success(users) {
       updated_list = arr_replace(users, result.index, 1, result.user)
@@ -252,9 +252,7 @@ f delete_user_by_id(id, success_cb, error_cb) {
 
 f get_user_by_id(id, success_cb, error_cb) {
   load_users(f success(users) {
-    users_found = filter(f f(item, index) {
-      return item
-    }, map(f f(user, index) {
+    users_found = filter(map(users, f f(user, index) {
       ret = false
       
       if(user.id == id) {
@@ -265,7 +263,9 @@ f get_user_by_id(id, success_cb, error_cb) {
       }
       
       return ret
-    }, users))
+    }), f f(item, index) {
+      return item
+    })
     
     if(length(users_found) == 1) {
       success_cb(users_found[0])
@@ -382,7 +382,7 @@ f handle_put_request(req, callback) {
 }
 
 f get_matching_route(path, method) {
-  return reduce(f f(acc, item, index) {
+  return reduce(routes, f f(acc, item, index) {
     if(acc) {
       acc = acc
     } else(method == item.method) {
@@ -392,7 +392,7 @@ f get_matching_route(path, method) {
     }
     
     return acc
-  }, routes, false)
+  }, false)
 }
 
 f execute_route(route, req, callback) {
