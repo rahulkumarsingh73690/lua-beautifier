@@ -1,4 +1,7 @@
 
+const path = require('path')
+const fs = require('fs')
+
 function removeEmptyLines(inst) {
   return inst.replace(/^\s*/, '')
 }
@@ -8,7 +11,7 @@ function ensureArray(arg) {
 }
 
 function isReservedWord(word) {
-  return /^(return|if|else|true|false)$/.test(word)
+  return /^(return|if|else|true|false|not|and|x?or)$/.test(word)
 }
 
 const isExtensibleExpression = (function() {
@@ -22,6 +25,10 @@ const isExtensibleExpression = (function() {
 })()
 
 const syntax = {
+  parseFile(filename) {
+    return syntax.parse(fs.readFileSync(path.resolve(filename)).toString())
+  },
+
   parse(code) {
     const ast = syntax.parseChunks(code)
     if(ast.remain)
@@ -194,9 +201,9 @@ const syntax = {
 
     if_cond_block = "(" cond ")"
 
-    cond = exp [ log_op exp ] *
+    cond = [ log_unary ] ? exp [ log_op exp ] *
 
-    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "&&" | "||"
+    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "and" | "xor" | "or"
 
     else = [ else_middle ] * else_end
 
@@ -405,27 +412,42 @@ const syntax = {
   },
 
   /*
-    cond = exp [ log_op exp ] *
+    cond = [ log_unary ] ? exp [ log_op exp ] *
 
-    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "&&" | "||"
+    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "and" | "xor" | "or"
   */
   parseDeclarationIfCond(inst) {
-    let exp = syntax.parseExpression(inst)
+    const conds = []
+    let code_inst = inst
+    let log_unary = syntax.parseLogUnary(code_inst)
+    if(log_unary) {
+      conds.push(log_unary.parsed)
+      code_inst = log_unary.remain
+    }
+
+    let exp = syntax.parseExpression(code_inst)
     if(!exp)
       return false
 
-    const conds = [exp.parsed]
+    conds.push(exp.parsed)
+
     let log_op = null
     while(1) {
       log_op = syntax.parseLogicOperator(exp.remain)
       if(!log_op)
         break
 
-      exp = syntax.parseExpression(log_op.remain)
+      log_unary = syntax.parseLogUnary(log_op.remain)
+      code_inst = log_unary ? log_unary.remain : log_op.remain
+
+      exp = syntax.parseExpression(code_inst)
       if(!exp)
         break
 
-      conds.push(log_op.parsed, exp.parsed)
+      if(log_unary)
+        conds.push(log_op.parsed, log_unary.parsed, exp.parsed)
+      else
+        conds.push(log_op.parsed, exp.parsed)
     }
 
     return {
@@ -439,11 +461,31 @@ const syntax = {
   },
 
   /*
-    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "&&" | "||"
+    log_unary = "not"
+  */
+  parseLogUnary(inst) {
+    if(!/^(\s*\b(not)\b\s*)/.test(inst))
+      return false
+
+    return {
+      original: inst,
+      remain: inst.substr(RegExp.$1.length),
+      parsed: {
+        type: 'log_unary',
+        args: {
+          value: RegExp.$2
+        }
+      }
+    }
+  },
+
+  /*
+    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "and" | "xor" | "or"
   */
   parseLogicOperator(inst) {
-    if(!/^(\s*(\|\||&&|<=|>=|!=|==|>|<|=)\s*)/.test(inst))
-      return false
+    if(!/^(\s*(<=|>=|!=|==|>|<|=)\s*)/.test(inst))
+      if(!/^(\s*\b(x?or|and)\b\s*)/.test(inst))
+        return false
 
     const log_op_block = RegExp.$1
     const log_op = RegExp.$2

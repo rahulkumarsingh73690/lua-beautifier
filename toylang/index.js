@@ -1,7 +1,6 @@
 
 const path = require('path')
 const fs = require('fs')
-const modules_cache = {}
 
 function readfile(filename) {
   return fs.readFileSync(path.resolve(filename), 'utf-8').toString()
