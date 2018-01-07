@@ -1,16 +1,7 @@
-
-f s(a) {
-  if(a) {
-    print('s', 10)
-    return a
-  } else {
-    print('s', 20)
-    return s
-  }
+if(
+not F xor T
+) {
+  print(T)
+} else {
+  print(F)
 }
-
-returns_a = 1
-print(s(returns_a))
-
-returns_s = 0
-print(s(returns_s))

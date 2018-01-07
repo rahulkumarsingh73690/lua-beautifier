@@ -1,4 +1,70 @@
+/*
+  toylang BNF
 
+    chunk = [ exp ] *
+
+    exp = [ assign | math_operation | func_call | func_def | primitive | variable ] [ ext_exp ] *
+
+    assign = variable "=" exp
+
+    variable = [ a-z ] + [ [ "-" ] ? [ _a-z0-9 ] + ] *
+
+    math_operation = exp [ math_operator exp ] +
+
+    math_operator = [ "-" | "+" | "*" | "/" ]
+
+    func_call = variable func_call_args_chunk
+
+    func_call_args_chunk = "(" [ func_call_args_list ] ? ")"
+
+    func_call_args_list = exp [ "," exp ] *
+
+    func_def = "f " variable "(" [ func_def_args_list ] ? ")" "{" func_def_chunk "}"
+
+    func_def_args_list = variable [ "," variable ] *
+
+    func_def_chunk = chunk func_def_return
+
+    func_def_return = "return " exp
+
+    primitive = [ number | string | boolean | array | object ]
+
+    number = [ "+" | "-" ] ? [ 0-9 ] + [ "." [ 0-9 ] + ] ?
+
+    string = [ "'" [ ALPHA ] + "'" ] | [ """ [ ALPHA ] + """ ]
+
+    boolean = [ "T" | "F" ]
+
+    array = "[" [ exp [ "," exp ] * ] ? "]"
+
+    object = "{" [ variable "=" exp [ ";" variable "=" exp ] * ] ? "}"
+
+    ext_exp = [ ext_object | ext_array | func_call_args_chunk ]
+
+    ext_object = "." exp
+
+    ext_array = "[" exp "]"
+
+    decl = if
+
+    if = "if" if_cond_block if_chunk_block [ else ] ?
+
+    if_cond_block = "(" cond ")"
+
+    cond = [ log_unary ] ? exp [ log_op exp ] *
+
+    log_unary = "not"
+
+    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "and" | "xor" | "or"
+
+    if_chunk_block = "{" chunk "}"
+
+    else = [ else_middle ] * else_end
+
+    else_middle = "else" if_cond_block if_chunk_block
+
+    else_end = "else" if_chunk_block
+*/
 const path = require('path')
 const fs = require('fs')
 
@@ -11,7 +77,7 @@ function ensureArray(arg) {
 }
 
 function isReservedWord(word) {
-  return /^(return|if|else|true|false|not|and|x?or)$/.test(word)
+  return /^(return|if|else|T|F|and|x?or)$/.test(word)
 }
 
 const isExtensibleExpression = (function() {
@@ -41,6 +107,9 @@ const syntax = {
     throw new SyntaxError('Unexpected token somewhere (NYI)')
   },
 
+  /*
+    chunk = [ exp ] *
+  */
   parseChunks(inst, scope_name) {
     const chunks = []
     let chunk = null
@@ -69,6 +138,9 @@ const syntax = {
     }
   },
 
+  /*
+    exp = [ assign | math_operation | func_call | func_def | primitive | variable ] [ ext_exp ] ?
+  */
   parseExpression(inst, ignore_chunks) {
     ignore_chunks = ensureArray(ignore_chunks)
     inst = removeEmptyLines(inst)
@@ -106,11 +178,7 @@ const syntax = {
   },
 
   /*
-    ext_exp = exp [ ext_object | ext_array ] *
-
-    ext_object = "." exp
-
-    ext_array = "[" exp "]"
+    ext_exp = [ ext_object | ext_array | ext_func_call ] *
   */
   extendExpression(exp) {
     if(isExtensibleExpression(exp)) {
@@ -172,6 +240,9 @@ const syntax = {
     }
   },
 
+  /*
+    ext_func_call = func_call_args_chunk
+  */
   extendExpressionFuncCall(inst) {
     return syntax.parseFuncCallArgsChunk(inst)
   },
@@ -194,22 +265,6 @@ const syntax = {
 
   /*
     if = "if" if_cond_block if_chunk_block [ else ] ?
-
-    if_chunk_block = "{" if_chunk "}"
-
-    if_chunk = chunk
-
-    if_cond_block = "(" cond ")"
-
-    cond = [ log_unary ] ? exp [ log_op exp ] *
-
-    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "and" | "xor" | "or"
-
-    else = [ else_middle ] * else_end
-
-    else_middle = "else" if_cond_block if_chunk_block
-
-    else_end = "else" if_chunk_block
   */
   parseDeclarationIf(inst, scope_name) {
     if(!/^(\s*if\s*)/.test(inst))
@@ -241,10 +296,6 @@ const syntax = {
 
   /*
     else = [ else_middle ] * else_end
-
-    else_middle = "else" if_cond_block if_chunk_block
-
-    else_end = "else" if_chunk_block
   */
   parseDeclarationIfElse(inst, scope_name) {
     const else_middles = []
@@ -386,7 +437,19 @@ const syntax = {
     if_chunk = chunk
   */
   parseDeclarationIfChunk(inst, scope_name) {
-    return syntax.parseChunks(inst, scope_name)
+    const chunks = syntax.parseChunks(inst, scope_name)
+    if(!chunks)
+      return false
+
+    if(scope_name === 'func_def') {
+      const ret = syntax.parseFuncDefChunkReturn(chunks.remain, scope_name)
+      if(ret) {
+        chunks.remain = ret.remain
+        chunks.parsed.args.value.push(ret)
+      }
+    }
+
+    return chunks
   },
 
   /*
@@ -417,13 +480,11 @@ const syntax = {
 
   /*
     cond = [ log_unary ] ? exp [ log_op exp ] *
-
-    log_op = ">" | "<" | "==" | "!=" | ">=" | "<=" | "and" | "xor" | "or"
   */
   parseDeclarationIfCond(inst) {
     const conds = []
     let code_inst = inst
-    let log_unary = syntax.parseLogUnary(code_inst)
+    let log_unary = syntax.parseLogicUnary(code_inst)
     if(log_unary) {
       conds.push(log_unary.parsed)
       code_inst = log_unary.remain
@@ -441,7 +502,7 @@ const syntax = {
       if(!log_op)
         break
 
-      log_unary = syntax.parseLogUnary(log_op.remain)
+      log_unary = syntax.parseLogicUnary(log_op.remain)
       code_inst = log_unary ? log_unary.remain : log_op.remain
 
       exp = syntax.parseExpression(code_inst)
@@ -467,7 +528,7 @@ const syntax = {
   /*
     log_unary = "not"
   */
-  parseLogUnary(inst) {
+  parseLogicUnary(inst) {
     if(!/^(\s*\b(not)\b\s*)/.test(inst))
       return false
 
@@ -506,6 +567,9 @@ const syntax = {
     }
   },
 
+  /*
+    math_operation = exp [ math_operator exp ] +
+  */
   parseMathOperation(inst) {
     const exp1 = syntax.parseExpression(inst, ['math_operation'])
     if(!exp1)
@@ -555,24 +619,29 @@ const syntax = {
     return chain
   },
 
+  /*
+    math_operator = [ "-" | "+" | "*" | "/" ]
+  */
   parseMathOperator(inst) {
     if(!/^([-+*\/])/.test(inst))
       return false
 
+    const op = RegExp.$1
+
     return {
-      remain: inst.substr(RegExp.$1.length),
+      remain: inst.substr(op.length),
       original: inst,
       parsed: {
         type: 'operator',
         args: {
-          operator: RegExp.$1
+          operator: op
         }
       }
     }
   },
 
   /*
-    primitive = number | string | boolean | array | object
+    primitive = [ number | string | boolean | array | object ]
   */
   parsePrimitive(inst) {
     let exp = syntax.parsePrimitiveNumber(inst) ||
@@ -592,9 +661,7 @@ const syntax = {
   },
 
   /*
-    obj = "{" [ obj_map ] ? "}"
-
-    obj_map = variable "=" exp | obj_map
+    object = "{" [ variable "=" exp [ ";" variable "=" exp ] * ] ? "}"
   */
   parsePrimitiveObject(inst) {
     if(!/^(\s*\{\s*)/.test(inst))
@@ -614,11 +681,6 @@ const syntax = {
     }
   },
 
-  /*
-    obj_map = variable "=" exp [ obj_map_continuation ] *
-
-    obj_map_continuation = ";" variable "=" exp
-  */
   parsePrimitiveObjectMap(inst) {
     const map = []
     let name = null
@@ -660,11 +722,7 @@ const syntax = {
   },
 
   /*
-    array = "[" [ array_list ] ? "]"
-
-    array_list = exp [ array_list_continuation ] *
-
-    array_list_continuation = "," exp
+    array = "[" [ exp [ "," exp ] * ] ? "]"
   */
   parsePrimitiveArray(inst) {
     if(!/^(\s*\[\s*)/.test(inst))
@@ -687,11 +745,6 @@ const syntax = {
     }
   },
 
-  /*
-    array_list = [ exp array_list_continuation * ] ?
-
-    array_list_continuation = "," exp
-  */
   parsePrimitiveArrayList(inst) {
     const array_list = {
       original: inst,
@@ -752,36 +805,38 @@ const syntax = {
   },
 
   /*
-    variable = [ _a-z ] +
+    variable = [ a-z ] + [ [ "-" ] ? [ _a-z0-9 ] + ] *
   */
   parseVariable(inst) {
-    if(!/^([a-z]+(\-?[_a-z0-9]+)*)/.test(inst))
+    if(!/^([a-z]+(-?[_a-z0-9]+)*)/.test(inst))
       return false
 
-    if(isReservedWord(RegExp.$1))
+    const v = RegExp.$1
+    if(isReservedWord(v))
       return false
 
     return {
-      remain: inst.substr(RegExp.$1.length),
+      remain: inst.substr(v.length),
       original: inst,
       parsed: {
         type: 'variable',
         args: {
-          value: RegExp.$1
+          value: v
         }
       }
     }
   },
 
   /*
-    number = [ "+" | "-" ] ? [0-9] +
+    number = [ "+" | "-" ] ? [ 0-9 ] + [ "." [ 0-9 ] + ] ?
   */
   parsePrimitiveNumber(inst) {
-    if(!/^([-+]?\d+(?:\.\d+)?)/.test(inst))
+    if(!/^(\b([-+]?\d+(?:\.\d+)?)\b)/.test(inst))
       return false
 
-    const n = RegExp.$1
-    const remain = inst.substr(n.length)
+    const number_block = RegExp.$1
+    const number = RegExp.$2
+    const remain = inst.substr(number_block.length)
 
     return {
       remain: remain,
@@ -789,12 +844,15 @@ const syntax = {
       parsed: {
         type: 'number',
         args: {
-          value: n
+          value: number
         }
       }
     }
   },
 
+  /*
+    string = [ "'" [ ALPHA ] + "'" ] | [ """ [ ALPHA ] + """ ]
+  */
   parsePrimitiveString(inst) {
     if(!(/^("([^"]*)")/.test(inst) || /^('([^']*)')/.test(inst)))
       return false
@@ -827,12 +885,16 @@ const syntax = {
       .replace(/~~/g, '~')
   },
 
+  /*
+    boolean = [ "T" | "F" ]
+  */
   parsePrimitiveBoolean(inst) {
-    if(!/^(true|false)/.test(inst))
+    if(!/^(\b(T|F)\b)/.test(inst))
       return false
 
-    const b = RegExp.$1
-    const remain = inst.substr(b.length)
+    const boolean_block = RegExp.$1
+    const boolean_value = RegExp.$2
+    const remain = inst.substr(boolean_block.length)
 
     return {
       remain: remain,
@@ -840,12 +902,15 @@ const syntax = {
       parsed: {
         type: 'boolean',
         args: {
-          value: b
+          value: boolean_value
         }
       }
     }
   },
 
+  /*
+    func_call = variable func_call_args_chunk
+  */
   parseFuncCall(inst) {
     const fname = syntax.parseVariable(inst)
     if(!fname)
@@ -869,11 +934,7 @@ const syntax = {
   },
 
   /*
-    func_call_args_chunk = "(" [ exp_list ] ? ")"
-
-    exp_list = exp [ exp_continuation ] *
-
-    exp_continuation = "," exp
+    func_call_args_chunk = "(" [ func_call_args_list ] ? ")"
   */
   parseFuncCallArgsChunk(inst) {
     if(!/^(\s*\(\s*)/.test(inst))
@@ -896,6 +957,9 @@ const syntax = {
     }
   },
 
+  /*
+    func_call_args_list = exp [ "," exp ] *
+  */
   parseFuncCallArgsList(inst) {
     const exps = []
     let code_inst = inst
@@ -931,8 +995,11 @@ const syntax = {
     }
   },
 
+  /*
+    func_def = "f " variable func_def_args_chunk "{" func_def_chunk "}"
+  */
   parseFuncDef(inst) {
-    if(!/^(f\s+)/.test(inst))
+    if(!/^(\bf\s+)/.test(inst))
       return false
 
     const fname = syntax.parseVariable(inst.substr(RegExp.$1.length))
@@ -945,7 +1012,10 @@ const syntax = {
     if(!fargs)
       return false
 
-    const body = syntax.parseFuncDefChunk(fargs.remain)
+    if(!/^(\s*\{\s*)/.test(fargs.remain))
+      return false
+
+    const body = syntax.parseFuncDefChunk(fargs.remain.substr(RegExp.$1.length))
     if(!body)
       return false
 
@@ -966,13 +1036,16 @@ const syntax = {
     }
   },
 
+  /*
+    func_def_args_chunk = "(" [ func_def_args_list ] ? ")"
+  */
   parseFuncDefArgsChunk(inst) {
     if(!/^(\s*\(\s*)/.test(inst))
       return false
 
     const varcs = syntax.parseFuncDefArgsList(inst.substr(RegExp.$1.length))
 
-    if(!/^(\s*\)\s*\{\s*)/.test(varcs.remain))
+    if(!/^(\s*\)\s*)/.test(varcs.remain))
       return false
 
     return {
@@ -985,6 +1058,9 @@ const syntax = {
     }
   },
 
+  /*
+    func_def_chunk = chunk func_def_return
+  */
   parseFuncDefChunk(inst) {
     const scope_name = 'func_def'
     const chunks = syntax.parseChunks(inst, scope_name)
@@ -1032,6 +1108,9 @@ const syntax = {
     return false
   },
 
+  /*
+    func_def_return = "return" exp
+  */
   parseFuncDefChunkReturn(inst, scope_name) {
     if(scope_name === 'global')
       return false
@@ -1053,6 +1132,9 @@ const syntax = {
     }
   },
 
+  /*
+    func_def_args_list = variable [ "," variable ] *
+  */
   parseFuncDefArgsList(inst) {
     const args = []
     let arg = null

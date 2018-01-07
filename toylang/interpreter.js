@@ -418,79 +418,115 @@ const interpreter = {
   intCondBlock(ast, scope) {
     const ops = []
     const exps = []
+    const unary = []
 
     ast.args.value.parsed.args.forEach(function(arg, index) {
-      (index & 1 ? ops : exps).push(arg)
+      if(arg.type === 'log_op')
+        ops.push(arg)
+      else if(arg.type === 'log_unary')
+        unary.push(arg)
+      else {
+        arg.unary = unary.shift()
+        exps.push(arg)
+      }
     })
 
-    return ops.reduce(function(acc, op, index) {
-      const exp = exps[index + 1]
+    return ops.reduce(function(val1, op, index) {
+      const val2 = exps.shift()
 
       if(op.args.value === '<')
-        return interpreter.intLogOpLT(acc, exp, scope)
+        return interpreter.intLogOpLT(val1, val2, scope)
 
       else if(op.args.value === '>')
-        return interpreter.intLogOpGT(acc, exp, scope)
+        return interpreter.intLogOpGT(val1, val2, scope)
 
       else if(op.args.value === '==')
-        return interpreter.intLogOpEQ(acc, exp, scope)
+        return interpreter.intLogOpEQ(val1, val2, scope)
 
       else if(op.args.value === '!=')
-        return interpreter.intLogOpNEQ(acc, exp, scope)
+        return interpreter.intLogOpNEQ(val1, val2, scope)
 
       else if(op.args.value === '>=')
-        return interpreter.intLogOpGTE(acc, exp, scope)
+        return interpreter.intLogOpGTE(val1, val2, scope)
 
       else if(op.args.value === '<=')
-        return interpreter.intLogOpLTE(acc, exp, scope)
+        return interpreter.intLogOpLTE(val1, val2, scope)
 
       else if(op.args.value === 'and')
-        return interpreter.intLogOpAND(acc, exp, scope)
+        return interpreter.intLogOpAND(val1, val2, scope)
 
       else if(op.args.value === 'or')
-        return interpreter.intLogOpOR(acc, exp, scope)
+        return interpreter.intLogOpOR(val1, val2, scope)
+
+      else if(op.args.value === 'xor')
+        return interpreter.intLogOpXOR(val1, val2, scope)
 
       else
         throw new Error('Interpreter error (intCondBlock): ' + op.args.value)
-    }, interpreter.intExpression(exps[0], scope))
+    }, interpreter.intExpression(exps.shift(), scope))
   },
 
+  // not
+  intLogOpNOT(val1) {
+    return !val1
+  },
+
+  // and
   intLogOpAND(val1, exp, scope) {
     return val1 && interpreter.intExpression(exp, scope);
   },
 
+  // or
   intLogOpOR(val1, exp, scope) {
     return val1 || interpreter.intExpression(exp, scope);
   },
 
+  // xor
+  intLogOpXOR(val1, exp, scope) {
+    const val2 = interpreter.intExpression(exp, scope);
+    return (val1 && !val2) || (!val1 && val2);
+  },
+
+  // <=
   intLogOpLTE(val1, exp, scope) {
     const val2 = interpreter.intExpression(exp, scope)
     return val1 !== false && val1 <= val2 ? val2 : false;
   },
 
+  // >=
   intLogOpGTE(val1, exp, scope) {
     const val2 = interpreter.intExpression(exp, scope)
     return val1 !== false && val1 >= val2 ? val2 : false;
   },
 
-  intLogOpNEQ(val1, exp, scope) {
-    const val2 = interpreter.intExpression(exp, scope)
-    return val1 !== false && val1 !== val2 ? val2 : false;
-  },
-
+  // <
   intLogOpLT(val1, exp, scope) {
     const val2 = interpreter.intExpression(exp, scope)
     return val1 !== false && val1 < val2 ? val2 : false;
   },
 
+  // >
   intLogOpGT(val1, exp, scope) {
     const val2 = interpreter.intExpression(exp, scope)
-    return val1 !== false && val1 > val2 ? val2 : false;
+    return val1 !== false && val1 > val2 ? val2 : false
   },
 
+  // ==
   intLogOpEQ(val1, exp, scope) {
     const val2 = interpreter.intExpression(exp, scope)
-    return val1 !== false && val1 === val2 ? val2 : false;
+    return val1 === val2
+  },
+
+  // !=
+  intLogOpNEQ(val1, exp, scope) {
+    const val2 = interpreter.intExpression(exp, scope)
+    return val1 !== val2
+  },
+
+  intUnary(ast, exp) {
+    if(ast.unary.type === 'log_unary')
+      return interpreter.intLogOpNOT(exp)
+    throw new Error('Interpreter error (intUnary): ' + ast.unary.type)
   },
 
   intFuncDef(ast, scope) {
@@ -598,7 +634,12 @@ const interpreter = {
     else
       throw exp
 
-    return interpreter.extExpression(ast, exp, scope)
+    exp = interpreter.extExpression(ast, exp, scope)
+
+    if(ast.unary)
+      exp = interpreter.intUnary(ast, exp)
+
+    return exp
   },
 
   extExpression(ast, exp, scope) {
@@ -708,7 +749,7 @@ const interpreter = {
   },
 
   intBoolean(ast, scope) {
-    return ast.value === 'true'
+    return ast.value === 'T'
   },
 
   intArray(ast, scope) {

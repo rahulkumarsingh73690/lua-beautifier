@@ -8,7 +8,7 @@ const syntax = toylang.syntax
 
 let space = '    '
 let repeat_spaces = 0
-let log_enabled = parseInt(process.argv[2])
+let log_enabled = parseInt(process.argv[4])
 const props = []
 log = log_enabled ? console.log : _ => 0
 for(const prop in syntax) {
@@ -24,6 +24,7 @@ for(const prop in syntax) {
       log(JSON.stringify(args, 0, 2).replace(/^(.)/gm, sp + '$1'))
 
       repeat_spaces++
+      var ret = orig(...args)
       props.pop()
       const json_ret = JSON.stringify(ret, 0, 2)
 
@@ -45,7 +46,7 @@ if(process.argv[2] === 'run') {
   toylang.run(filename)
 } else if(process.argv[2] === 'ast') {
   console.log('Parsing...')
-  const ast = toylang.syntax.parse(code)
+  const ast = syntax.parse(code)
   console.log(JSON.stringify(ast, 0, 2))
 } else {
   console.log('Usage:')
